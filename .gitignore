@@ -1,0 +1,16 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+DerivedData/
+
+# macOS
+.DS_Store
+
+# Xcode
+*.xcodeproj/
+xcuserdata/
+
+# App bundle produced by build.sh
+MyStat.app/
