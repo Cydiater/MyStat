@@ -1,8 +1,10 @@
 import Cocoa
+import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var timer: Timer?
+    private weak var launchAtLoginItem: NSMenuItem?
 
     private let monitor = StatsMonitor()
     private let pollInterval: TimeInterval = 2.0
@@ -70,11 +72,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(memItem)
 
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(
+        if #available(macOS 13.0, *) {
+            let enabled = SMAppService.mainApp.status == .enabled
+            let launchItem = NSMenuItem(
+                title: "Launch at Login",
+                action: #selector(toggleLaunchAtLogin(_:)),
+                keyEquivalent: ""
+            )
+            launchItem.target = self
+            launchItem.image = Self.launchAtLoginIcon(enabled: enabled)
+            menu.addItem(launchItem)
+            launchAtLoginItem = launchItem
+        }
+        let quitItem = NSMenuItem(
             title: "Quit MyStat",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
-        ))
+        )
+        quitItem.image = NSImage(systemSymbolName: "power", accessibilityDescription: nil)
+        menu.addItem(quitItem)
+        menu.delegate = self
         statusItem.menu = menu
 
         // Prime the CPU sampler so the first visible tick is meaningful.
@@ -89,6 +106,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private var lastMemorySnapshot = MemorySnapshot(usedBytes: 0, totalBytes: 0)
+
+    @available(macOS 13.0, *)
+    @objc private func toggleLaunchAtLogin(_ sender: NSMenuItem) {
+        let service = SMAppService.mainApp
+        do {
+            if service.status == .enabled {
+                try service.unregister()
+            } else {
+                try service.register()
+            }
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Couldn't update Launch at Login"
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+        }
+        sender.image = Self.launchAtLoginIcon(enabled: service.status == .enabled)
+    }
+
+    private static func launchAtLoginIcon(enabled: Bool) -> NSImage? {
+        let name = enabled ? "checkmark.circle.fill" : "circle"
+        return NSImage(systemSymbolName: name, accessibilityDescription: nil)
+    }
 
     @objc private func rangeChanged(_ sender: NSSegmentedControl) {
         let idx = sender.selectedSegment
@@ -138,5 +178,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 mem.percent
             )
         )
+    }
+}
+
+extension AppDelegate: NSMenuDelegate {
+    func menuWillOpen(_ menu: NSMenu) {
+        if #available(macOS 13.0, *), let item = launchAtLoginItem {
+            let enabled = SMAppService.mainApp.status == .enabled
+            item.image = AppDelegate.launchAtLoginIcon(enabled: enabled)
+        }
     }
 }
