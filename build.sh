@@ -3,10 +3,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-swift build -c release
+swift build -c release --arch arm64 --arch x86_64
 
 APP="MyStat.app"
-BIN="$(swift build -c release --show-bin-path)/MyStat"
+BIN="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/MyStat"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
