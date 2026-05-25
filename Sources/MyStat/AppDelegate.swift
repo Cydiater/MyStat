@@ -5,8 +5,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var timer: Timer?
     private weak var launchAtLoginItem: NSMenuItem?
+    private let deviceMenuTag = 100
+    private var lastKnownDevices: [String] = []
 
     private let monitor = StatsMonitor()
+    private let statsServer = StatsServer()
     private let pollInterval: TimeInterval = 2.0
 
     /// Long-lived sample buffer. The status bar always reads the most recent
@@ -94,6 +97,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.delegate = self
         statusItem.menu = menu
 
+        statsServer.start()
+
         // Prime the CPU sampler so the first visible tick is meaningful.
         _ = monitor.cpuUsage()
 
@@ -144,7 +149,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let mem = monitor.memory()
         history.record(cpu: cpu, memory: mem.percent)
         lastMemorySnapshot = mem
+        statsServer.update(
+            cpu: cpu, mem: mem.percent,
+            cpuHistory: history.cpu, memHistory: history.memory,
+            interval: pollInterval
+        )
+        updateDeviceMenu()
         renderViews()
+    }
+
+    private func updateDeviceMenu() {
+        let devices = statsServer.activeDevices
+        guard devices != lastKnownDevices else { return }
+        lastKnownDevices = devices
+
+        guard let menu = statusItem.menu else { return }
+
+        menu.items.filter { $0.tag >= deviceMenuTag }.forEach { menu.removeItem($0) }
+
+        guard !devices.isEmpty else { return }
+
+        let insertAt = 3
+        let sep = NSMenuItem.separator()
+        sep.tag = deviceMenuTag
+        menu.insertItem(sep, at: insertAt)
+
+        for (i, device) in devices.enumerated() {
+            let item = NSMenuItem()
+            item.title = device
+            item.image = NSImage(systemSymbolName: "iphone", accessibilityDescription: nil)
+            item.isEnabled = false
+            item.tag = deviceMenuTag + 1 + i
+            menu.insertItem(item, at: insertAt + 1 + i)
+        }
     }
 
     private func renderViews() {
