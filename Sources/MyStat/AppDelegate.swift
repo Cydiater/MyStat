@@ -1,10 +1,15 @@
 import Cocoa
 import ServiceManagement
+import IOKit.pwr_mgt
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var timer: Timer?
     private weak var launchAtLoginItem: NSMenuItem?
+    private weak var keepAwakeItem: NSMenuItem?
+    private weak var sharingItem: NSMenuItem?
+    private var sleepAssertionID: IOPMAssertionID = 0
+    private var keepAwake = false
     private let deviceMenuTag = 100
     private var lastKnownDevices: [String] = []
 
@@ -74,7 +79,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(cpuItem)
         menu.addItem(memItem)
 
-        menu.addItem(.separator())
+        menu.addItem(Self.insetSeparator())
+        let sharing = NSMenuItem(title: "Starting iPhone sharing…", action: nil, keyEquivalent: "")
+        sharing.isEnabled = false
+        menu.addItem(sharing)
+        sharingItem = sharing
+        statsServer.onStatusChange = { [weak self] text in self?.sharingItem?.title = text }
+        let keepAwakeMenuItem = NSMenuItem(
+            title: "Keep Awake",
+            action: #selector(toggleKeepAwake(_:)),
+            keyEquivalent: ""
+        )
+        keepAwakeMenuItem.target = self
+        keepAwakeMenuItem.state = keepAwake ? .on : .off
+        menu.addItem(keepAwakeMenuItem)
+        keepAwakeItem = keepAwakeMenuItem
+
         if #available(macOS 13.0, *) {
             let enabled = SMAppService.mainApp.status == .enabled
             let launchItem = NSMenuItem(
@@ -83,16 +103,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 keyEquivalent: ""
             )
             launchItem.target = self
-            launchItem.image = Self.launchAtLoginIcon(enabled: enabled)
+            launchItem.state = enabled ? .on : .off
             menu.addItem(launchItem)
             launchAtLoginItem = launchItem
         }
+        menu.addItem(Self.insetSeparator())
         let quitItem = NSMenuItem(
             title: "Quit MyStat",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )
-        quitItem.image = NSImage(systemSymbolName: "power", accessibilityDescription: nil)
         menu.addItem(quitItem)
         menu.delegate = self
         statusItem.menu = menu
@@ -112,6 +132,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var lastMemorySnapshot = MemorySnapshot(usedBytes: 0, totalBytes: 0)
 
+    /// A separator whose line is inset on the left so it clears the checkmark
+    /// gutter used by the toggle items, instead of spanning the full width.
+    private static func insetSeparator() -> NSMenuItem {
+        let item = NSMenuItem()
+        item.view = InsetSeparatorView(frame: NSRect(x: 0, y: 0, width: 260, height: 11))
+        return item
+    }
+
     @available(macOS 13.0, *)
     @objc private func toggleLaunchAtLogin(_ sender: NSMenuItem) {
         let service = SMAppService.mainApp
@@ -127,12 +155,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             alert.informativeText = error.localizedDescription
             alert.runModal()
         }
-        sender.image = Self.launchAtLoginIcon(enabled: service.status == .enabled)
+        sender.state = service.status == .enabled ? .on : .off
     }
 
-    private static func launchAtLoginIcon(enabled: Bool) -> NSImage? {
-        let name = enabled ? "checkmark.circle.fill" : "circle"
-        return NSImage(systemSymbolName: name, accessibilityDescription: nil)
+    @objc private func toggleKeepAwake(_ sender: NSMenuItem) {
+        if keepAwake {
+            IOPMAssertionRelease(sleepAssertionID)
+            sleepAssertionID = 0
+            keepAwake = false
+        } else {
+            var assertionID: IOPMAssertionID = 0
+            let result = IOPMAssertionCreateWithName(
+                kIOPMAssertionTypePreventUserIdleSystemSleep as CFString,
+                IOPMAssertionLevel(kIOPMAssertionLevelOn),
+                "MyStat keeping Mac awake" as CFString,
+                &assertionID
+            )
+            if result == kIOReturnSuccess {
+                sleepAssertionID = assertionID
+                keepAwake = true
+            }
+        }
+        sender.state = keepAwake ? .on : .off
     }
 
     @objc private func rangeChanged(_ sender: NSSegmentedControl) {
@@ -150,12 +194,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         history.record(cpu: cpu, memory: mem.percent)
         lastMemorySnapshot = mem
         statsServer.update(
-            cpu: cpu, mem: mem.percent,
-            cpuHistory: history.cpu, memHistory: history.memory,
+            samples: history.samples, usedBytes: mem.usedBytes, totalBytes: mem.totalBytes,
             interval: pollInterval
         )
         updateDeviceMenu()
         renderViews()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        timer?.invalidate()
+        statsServer.stop()
+        if keepAwake { IOPMAssertionRelease(sleepAssertionID) }
     }
 
     private func updateDeviceMenu() {
@@ -221,8 +270,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 extension AppDelegate: NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         if #available(macOS 13.0, *), let item = launchAtLoginItem {
-            let enabled = SMAppService.mainApp.status == .enabled
-            item.image = AppDelegate.launchAtLoginIcon(enabled: enabled)
+            item.state = SMAppService.mainApp.status == .enabled ? .on : .off
         }
+    }
+}
+
+/// Draws a thin separator line that is inset from the left edge so it does not
+/// run across the menu's checkmark gutter.
+private final class InsetSeparatorView: NSView {
+    private let leftInset: CGFloat = 21
+    private let rightInset: CGFloat = 8
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.separatorColor.setFill()
+        let line = NSRect(
+            x: leftInset,
+            y: (bounds.height - 1).rounded() / 2,
+            width: bounds.width - leftInset - rightInset,
+            height: 1
+        )
+        line.fill()
     }
 }

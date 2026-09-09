@@ -24,5 +24,9 @@
     <string>NSApplication</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>MyStat shares CPU and memory readings with your iPhone on the local network.</string>
+    <key>NSBonjourServices</key>
+    <array><string>_mystat._tcp</string></array>
 </dict>
 </plist>

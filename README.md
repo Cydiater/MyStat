@@ -1,67 +1,92 @@
 # MyStat
 
-A tiny macOS menu bar app that shows live CPU and memory usage as sparklines, in the style of iStat Menus. Click the menu bar item for larger charts over a configurable window.
+A small native Mac CPU/memory monitor with an iPhone companion. Use the menu bar for a quick glance, or turn your iPhone into a live desk display.
 
-## Features
+## Live desk display
 
-- Vertical `CPU` / `MEM` labels next to per-metric mini sparklines, rendered as a [template image](https://developer.apple.com/documentation/appkit/nsimage/1520017-istemplate) so AppKit tints them to match the menu bar (white on dark, black on light, with proper active-state highlight).
-- Click → dropdown with two large charts (orange for CPU, teal for memory), a `3m / 15m / 1h` time-range picker, minute-spaced grid + axis labels, and live numeric readouts (CPU %, memory used / total in GB).
-- Pure Swift + AppKit. SwiftPM-buildable, no Xcode project required.
-- ~30 KB of in-memory history; no disk persistence, no telemetry, no network.
+1. Run MyStat on your Mac and iPhone, on the same local network. Allow **Local Network** access when iOS asks.
+2. The iPhone discovers your Mac automatically. Use the computer menu to choose a different Mac if needed.
+3. Tap **Open Desk Display**. Leave MyStat visible in portrait or landscape for live readings approximately every two seconds.
+4. If your Mac should keep monitoring while its display sleeps, enable **Keep Awake** in the Mac’s MyStat menu. This prevents idle system sleep; closing a MacBook’s lid can still put it to sleep.
 
-## Requirements
+Desk Display shows large CPU and memory readings, memory used/total, three-minute sparklines, and the age of the last measurement. The moon button dims the interface. Auto-lock is disabled only while Desk Display is visible and active; closing it or backgrounding the app restores the previous setting.
 
-- macOS 12 or later
-- Swift toolchain (Xcode or the Swift.org installer). Verified on Swift 6.3 / Apple Silicon.
+On a lost connection, the last reading stays visible with an **OFFLINE** label and its age. Requests time out and reconnect automatically. Returning to the app fetches the Mac’s rolling history to fill gaps. The regular dashboard supports pinch-to-zoom and panning through up to 24 hours of saved history. Switching Macs clears the displayed history so different computers’ measurements are not mixed.
 
-## Build & run
+## Apple StandBy and widgets
 
-```sh
-./build.sh         # swift build -c release, bundles into MyStat.app, ad-hoc codesigns
-open MyStat.app    # appears in the menu bar; no Dock icon (LSUIElement)
-```
+The widget and Desk Display have different refresh behavior:
 
-Or, to iterate without building an app bundle:
-
-```sh
-swift run -c release
-```
-
-Quit from the dropdown (`Quit MyStat`) or `pkill -x MyStat`.
-
-## Project layout
-
-```
-.
-├── Package.swift                  # SwiftPM executable, macOS 12+
-├── build.sh                       # release build → MyStat.app + ad-hoc codesign
-└── Sources/MyStat/
-    ├── main.swift                 # NSApplication bootstrap, .accessory policy
-    ├── AppDelegate.swift          # NSStatusItem, timer, menu, range picker
-    ├── StatsMonitor.swift         # CPU/memory sampling via Mach host_statistics
-    ├── StatsHistory.swift         # Ring buffer of samples (default 1h capacity)
-    ├── StatusBarRenderer.swift    # Draws the template image for the status bar
-    ├── StatsChartView.swift       # Larger NSView used inside the dropdown menu
-    └── Info.plist                 # LSUIElement, bundle identity for the .app
-```
-
-## How it works
-
-- **CPU** — `host_statistics(HOST_CPU_LOAD_INFO)` reports user / system / idle / nice tick counters. The monitor stores the previous totals and reports `100 × (totalΔ − idleΔ) / totalΔ` each tick.
-- **Memory** — `host_statistics64(HOST_VM_INFO64)` gives `active_count`, `wire_count`, and `compressor_page_count`. Used bytes is `(active + wired + compressed) × vm_kernel_page_size`. Total is `sysctlbyname("hw.memsize")`. The percent matches the "Memory Pressure" denominator macOS uses.
-- **Polling** — a single `Timer` on the main run loop in `.common` modes (so it fires while the menu is open), default every 2 seconds.
-- **Status bar drawing** — every tick renders a fresh `NSImage` via `NSImage(size:flipped:drawingHandler:)` and assigns it to `statusItem.button.image`. `isTemplate = true` means only the alpha channel is used; AppKit handles tinting and the selection highlight.
-- **Dropdown charts** — `StatsChartView` is an `NSView` placed as the `view` of `NSMenuItem`s. The segmented control above them mutates `windowMinutes`; each tick the views are re-fed the right `suffix(N)` slice of the buffer.
-
-## Customization
-
-Most knobs live at the top of `AppDelegate.swift`:
-
-| Constant | Default | Effect |
+| | Desk Display | Apple StandBy / Home Screen widget |
 | --- | --- | --- |
-| `pollInterval` | `2.0` s | Sample rate (also drives buffer size) |
-| `maxHistoryMinutes` | `60` | Ring buffer length |
-| `statusBarMinutes` | `3` | Window for the menu-bar sparklines |
-| `availableRanges` | `3m / 15m / 1h` | Segmented picker options for the dropdown |
+| Updates | About every two seconds while the app is visible | When iOS grants a timeline refresh, or when you tap Refresh |
+| Screen | MyStat stays in the foreground | Managed by iOS |
+| Connection | Polls and reconnects continuously | Fetches directly from the last selected Mac, with a bounded timeout |
+| Old data | OFFLINE label and last reading age | Dimmed values, age label, and stale timeline entry |
 
-Status bar geometry (label width, chart width, gaps) is at the top of `StatusBarRenderer.swift`. Dropdown colors are passed in `cpuChartView` / `memChartView` setup — swap `.systemOrange` / `.systemTeal` for whatever you like, or `.labelColor` for a fully monochrome look.
+Open the iPhone app and connect once before adding the widget. This grants local network access and saves the Mac’s Bonjour service for the widget. The widget resolves that service again when refreshing, so it does not depend on a fixed IP address or on the app continuing to run in the background. Tap its refresh button for a new snapshot; tap the rest of the widget to open Desk Display.
+
+**Apple StandBy is not a continuous live monitor.** WidgetKit owns refresh timing, even when a refresh has been requested. MyStat requests periodic snapshot refreshes and includes a future stale entry, but iOS can delay rendering and reloads. The visible timestamp identifies how old a reading actually is. There is no silent-audio background loop.
+
+Apple’s references: [Keeping a widget up to date](https://developer.apple.com/documentation/widgetkit/keeping-a-widget-up-to-date), [Local network privacy for app extensions](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy).
+
+## Build
+
+### macOS
+
+Requires macOS 12+ and an installed Swift/Xcode toolchain. Launch at Login is available on macOS 13+.
+
+```sh
+./build.sh     # Universal arm64 + x86_64 release, app bundle, ad-hoc signature
+open MyStat.app
+```
+
+For development: `swift run`. The app has no Dock icon. Its menu provides larger charts with 3m / 15m / 1h ranges, iPhone sharing status, connected device names, Keep Awake, and Launch at Login.
+
+### iPhone and widget
+
+Requires iOS 17+, Xcode, and [XcodeGen](https://github.com/yonaskolb/XcodeGen). The generated Xcode project is ignored by Git; `project.yml` is the source of truth.
+
+```sh
+xcodegen generate --spec MyStat-iOS/project.yml
+open MyStat-iOS/MyStat-iOS.xcodeproj
+```
+
+Select the `MyStat-iOS` scheme and your iPhone. Set the development team and bundle identifiers for your signing account if needed, and use the same App Group identifier in both entitlements and `SharedDefaults.swift`. Build and run. Updating both the Mac and phone is recommended: the new server includes exact sample timestamps and memory byte counts. The client also accepts the older history format.
+
+To check compilation without device signing:
+
+```sh
+xcodebuild -project MyStat-iOS/MyStat-iOS.xcodeproj \
+  -scheme MyStat-iOS -destination 'generic/platform=iOS Simulator' \
+  CODE_SIGNING_ALLOWED=NO build
+```
+
+## Troubleshooting
+
+- **No Mac found:** Check that both devices share a local network, MyStat is running, and iOS Settings → Privacy & Security → Local Network permits MyStat. Guest Wi-Fi or network isolation may block discovery and connections.
+- **Readings stopped:** Wake the Mac, then check the iPhone’s connection message. Reconnection is automatic; Retry restarts discovery immediately. Keep Awake on the Mac prevents idle system sleep, not lid-closed or manually requested sleep.
+- **Sharing unavailable:** The Mac menu reports the listener state. Check whether another MyStat instance is using TCP port 18735 and whether your firewall allows it. The server retries listener failures automatically.
+- **Widget remains old:** Open the app to establish local network permission and choose a Mac. Tap Refresh on the widget. For continuously live readings, use Desk Display.
+- **A different Mac is selected:** Choose the intended Mac from the iPhone’s computer menu. The selection persists across launches and network interruptions.
+
+## Code layout
+
+- `Sources/MyStat/`: AppKit menu bar app, Mach CPU/memory sampling, one-hour timestamped history, and Bonjour HTTP server.
+- `Sources/MyStatCore/`: Shared payloads, validation, bounded history merging, and cancellable HTTP transport. Compiled by SwiftPM and included in both iOS targets by XcodeGen.
+- `MyStat-iOS/MyStat-iOS/`: SwiftUI dashboard, Desk Display, discovery/polling, and local history persistence.
+- `MyStat-iOS/Shared/`: App Group server selection and complete cached snapshots.
+- `MyStat-iOS/MyStatWidget/`: Widget timeline, direct fetching, and refresh intent.
+- `Tests/MyStatCoreTests/`: Protocol and transport regression tests.
+
+CPU usage comes from differences in Mach host CPU tick counters. Memory use is active + wired + compressed memory divided by physical RAM; it is a utilization estimate, not macOS’s memory-pressure metric. There are no third-party runtime dependencies or cloud services. The Mac serves read-only stats over unauthenticated local HTTP (`_mystat._tcp`, port 18735); use it on a trusted local network.
+
+The Mac keeps one hour in memory. The iPhone keeps up to 24 hours / 43,200 samples in `stats_history.json`, with serialized atomic saves and retry on write failure. The widget stores only the latest snapshot and selected Mac in the App Group.
+
+## Tests
+
+```sh
+swift test
+```
+
+Coverage includes split TCP headers/bodies, truncated and malformed responses, deadlines, cancellation before/during a request, reconnecting with a new request, payload validation, legacy history, sample timestamp round trips, history deduplication and retention. Physical-device StandBy scheduling, local network permission prompts, and extended charging sessions must also be checked on an iPhone; simulator and unit tests cannot verify iOS’s real background/widget scheduling.

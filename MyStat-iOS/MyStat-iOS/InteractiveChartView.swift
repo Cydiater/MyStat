@@ -36,15 +36,32 @@ struct InteractiveChartView: View {
         effectiveEnd.addingTimeInterval(-effectiveDuration)
     }
 
-    private var displaySamples: [StatsSample] {
+    private struct ChartPoint: Identifiable {
+        let sample: StatsSample
+        let segment: Int
+        var id: Date { sample.timestamp }
+    }
+
+    private var displayPoints: [ChartPoint] {
         let end = effectiveEnd
         let start = windowStart
         let filtered = samples.filter { $0.timestamp >= start && $0.timestamp <= end }
-        return downsample(filtered, maxPoints: 300)
+        // Mark gaps before downsampling so a disconnected or sleeping Mac
+        // doesn't appear to have supplied measurements across the missing time.
+        var segment = 0
+        var previous: Date?
+        let points = filtered.map { sample in
+            if let previous, sample.timestamp.timeIntervalSince(previous) > 6 { segment += 1 }
+            previous = sample.timestamp
+            return ChartPoint(sample: sample, segment: segment)
+        }
+        guard points.count > 300 else { return points }
+        let step = Double(points.count - 1) / 299
+        return (0..<300).map { points[Int((Double($0) * step).rounded())] }
     }
 
     private var currentValue: Double? {
-        displaySamples.last?[keyPath: valuePath]
+        displayPoints.last?.sample[keyPath: valuePath]
     }
 
     var body: some View {
@@ -102,17 +119,19 @@ struct InteractiveChartView: View {
     }
 
     private var chart: some View {
-        Chart(displaySamples, id: \.timestamp) { sample in
+        Chart(displayPoints) { point in
             LineMark(
-                x: .value("Time", sample.timestamp),
-                y: .value(title, sample[keyPath: valuePath])
+                x: .value("Time", point.sample.timestamp),
+                y: .value(title, point.sample[keyPath: valuePath]),
+                series: .value("Segment", point.segment)
             )
             .foregroundStyle(color)
             .interpolationMethod(.monotone)
 
             AreaMark(
-                x: .value("Time", sample.timestamp),
-                y: .value(title, sample[keyPath: valuePath])
+                x: .value("Time", point.sample.timestamp),
+                y: .value(title, point.sample[keyPath: valuePath]),
+                series: .value("Segment", point.segment)
             )
             .foregroundStyle(
                 LinearGradient(
@@ -181,9 +200,10 @@ struct InteractiveChartView: View {
                 isLive = false
 
                 if let first = samples.first {
-                    let earliest = first.timestamp.addingTimeInterval(duration)
+                    let earliest = min(Date.now, first.timestamp.addingTimeInterval(duration))
                     if newEnd < earliest {
                         endTime = earliest
+                        isLive = earliest >= Date.now.addingTimeInterval(-1)
                         return
                     }
                 }
@@ -197,14 +217,6 @@ struct InteractiveChartView: View {
     }
 
     // MARK: - Helpers
-
-    private func downsample(_ data: [StatsSample], maxPoints: Int) -> [StatsSample] {
-        guard data.count > maxPoints else { return data }
-        let step = Double(data.count - 1) / Double(maxPoints - 1)
-        return (0..<maxPoints).map { i in
-            data[Int(Double(i) * step)]
-        }
-    }
 
     private func durationLabel(_ d: TimeInterval) -> String {
         if d < 60 { return "\(Int(d))s" }

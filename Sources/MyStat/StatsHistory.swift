@@ -1,20 +1,21 @@
 import Foundation
+import MyStatCore
 
 final class StatsHistory {
     let capacity: Int
-    private(set) var cpu: [Double] = []
-    private(set) var memory: [Double] = []
+    private(set) var samples: [StatsSample] = []
+    var cpu: [Double] { samples.map(\.cpu) }
+    var memory: [Double] { samples.map(\.mem) }
 
     init(capacity: Int) {
         self.capacity = capacity
-        cpu.reserveCapacity(capacity)
-        memory.reserveCapacity(capacity)
+        samples.reserveCapacity(capacity)
     }
 
-    func record(cpu cpuValue: Double, memory memValue: Double) {
-        cpu.append(cpuValue)
-        memory.append(memValue)
-        if cpu.count > capacity { cpu.removeFirst(cpu.count - capacity) }
-        if memory.count > capacity { memory.removeFirst(memory.count - capacity) }
+    func record(cpu: Double, memory: Double, timestamp: Date = .now) {
+        samples.append(StatsSample(timestamp: timestamp, cpu: min(100, max(0, cpu)), mem: min(100, max(0, memory))))
+        let cutoff = timestamp.addingTimeInterval(-3600)
+        if let first = samples.firstIndex(where: { $0.timestamp >= cutoff }), first > 0 { samples.removeFirst(first) }
+        if samples.count > capacity { samples.removeFirst(samples.count - capacity) }
     }
 }

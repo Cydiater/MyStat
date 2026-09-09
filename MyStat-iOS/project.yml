@@ -18,6 +18,7 @@ targets:
     sources:
       - path: MyStat-iOS
       - path: Shared
+      - path: ../Sources/MyStatCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cydiater.MyStat-iOS
@@ -33,6 +34,7 @@ targets:
     sources:
       - path: MyStatWidget
       - path: Shared
+      - path: ../Sources/MyStatCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cydiater.MyStat-iOS.MyStatWidget

@@ -1,169 +1,211 @@
 import Foundation
 import Network
+import Observation
 import WidgetKit
 import UIKit
 
-@Observable
+@MainActor @Observable
 final class StatsClient {
-    var cpu: Double = 0
-    var mem: Double = 0
-    var isConnected = false
-    var hostName: String?
+    private(set) var latest: LiveStats?
+    private(set) var lastSuccess: Date?
+    private(set) var servers: [ServerAddress] = []
+    private(set) var selectedServer: ServerAddress? = SharedDefaults.server
+    private(set) var connectionMessage = "Looking for your Mac…"
+    private(set) var isConnected = false
+    private(set) var historyMessage: String?
     let store = StatsStore()
 
+    var hostName: String { latest?.host ?? selectedServer?.name ?? "Your Mac" }
+    var cpu: Double { latest?.cpu ?? 0 }
+    var mem: Double { latest?.mem ?? 0 }
+    var lastSample: Date? { latest?.sample.timestamp }
+
     private var browser: NWBrowser?
-    private var endpoint: NWEndpoint?
-    private var timer: Timer?
+    private var pollTask: Task<Void, Never>?
+    private var historyTask: Task<Void, Never>?
+    private var browserRetry: Task<Void, Never>?
+    private var running = false
+    private var generation = UUID()
+    private var lastHistoryFetch: Date = .distantPast
     private var lastWidgetReload: Date = .distantPast
-    private var didFetchHistory = false
     private let deviceName = UIDevice.current.name
 
+    init() {
+        if let server = selectedServer { store.select(server) }
+        if let cached = SharedDefaults.load() { latest = cached.stats }
+    }
+
     func start() {
-        let params = NWParameters()
+        guard !running else { return }
+        running = true
+        startBrowser()
+        beginPolling()
+    }
+
+    private func startBrowser() {
+        browser?.cancel()
+        let params = NWParameters.tcp
         params.includePeerToPeer = true
-        browser = NWBrowser(for: .bonjour(type: "_mystat._tcp", domain: nil), using: params)
-
-        browser?.browseResultsChangedHandler = { [weak self] results, _ in
-            guard let self else { return }
-            DispatchQueue.main.async {
-                if let result = results.first {
-                    self.endpoint = result.endpoint
-                    if case .service(let name, _, _, _) = result.endpoint {
-                        self.hostName = name
-                    }
+        let browser = NWBrowser(for: .bonjour(type: "_mystat._tcp", domain: nil), using: params)
+        self.browser = browser
+        browser.browseResultsChangedHandler = { [weak self, weak browser] results, _ in
+            Task { @MainActor in
+                guard let self, self.running, self.browser === browser else { return }
+                self.servers = Array(Set(results.compactMap { ServerAddress(endpoint: $0.endpoint) }))
+                    .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+                if self.selectedServer == nil, let first = self.servers.first { self.select(first) }
+            }
+        }
+        browser.stateUpdateHandler = { [weak self, weak browser] state in
+            Task { @MainActor in
+                guard let self, self.running, self.browser === browser else { return }
+                switch state {
+                case .waiting(let error), .failed(let error):
                     if !self.isConnected {
-                        self.isConnected = true
-                        self.didFetchHistory = false
-                        self.startPolling()
+                        self.connectionMessage = "Discovery unavailable. Check Local Network access in Settings. \(error.localizedDescription)"
                     }
-                } else {
-                    self.endpoint = nil
-                    self.hostName = nil
+                    if case .failed = state { self.retryBrowser() }
+                default: break
+                }
+            }
+        }
+        browser.start(queue: .main)
+    }
+
+    private func retryBrowser() {
+        browserRetry?.cancel()
+        browserRetry = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(5)) } catch { return }
+            guard let self, self.running else { return }
+            self.startBrowser()
+        }
+    }
+
+    func select(_ server: ServerAddress) {
+        guard selectedServer != server else { return }
+        cancelRequests()
+        selectedServer = server
+        SharedDefaults.server = server
+        latest = nil
+        lastSuccess = nil
+        isConnected = false
+        lastHistoryFetch = .distantPast
+        historyMessage = nil
+        store.select(server)
+        WidgetCenter.shared.reloadTimelines(ofKind: SharedDefaults.widgetKind)
+        beginPolling()
+    }
+
+    private func beginPolling() {
+        pollTask?.cancel()
+        guard running, let server = selectedServer else { return }
+        let generation = generation
+        connectionMessage = "Connecting to \(server.name)…"
+        pollTask = Task { [weak self] in
+            var failures = 0
+            while !Task.isCancelled {
+                guard let self else { return }
+                do {
+                    let stats = try await StatsTransport.fetch(server, deviceName: self.deviceName)
+                    guard !Task.isCancelled, self.generation == generation else { return }
+                    let recovered = !self.isConnected
+                    self.latest = stats
+                    self.lastSuccess = .now
+                    self.isConnected = Date().timeIntervalSince(stats.sample.timestamp) < 10
+                        && stats.sample.timestamp.timeIntervalSinceNow < 60
+                    self.connectionMessage = self.isConnected ? "Connected" : "The Mac is responding, but its readings are old."
+                    self.store.append(stats.sample)
+                    SharedDefaults.save(stats, server: server)
+                    if recovered || Date().timeIntervalSince(self.lastWidgetReload) >= 60 {
+                        WidgetCenter.shared.reloadTimelines(ofKind: SharedDefaults.widgetKind)
+                        self.lastWidgetReload = .now
+                    }
+                    if recovered || Date().timeIntervalSince(self.lastHistoryFetch) >= 30 { self.fetchHistory() }
+                    await self.store.saveIfNeeded()
+                    failures = 0
+                } catch {
+                    guard !Task.isCancelled, self.generation == generation else { return }
                     self.isConnected = false
-                    self.didFetchHistory = false
-                    self.stopPolling()
+                    self.connectionMessage = "Reconnecting to \(server.name). \(error.localizedDescription)"
+                    failures += 1
                 }
+                do { try await Task.sleep(for: .seconds(min(10, failures == 0 ? 2 : Double(failures * 2)))) } catch { return }
             }
         }
-
-        browser?.start(queue: .main)
     }
 
-    private func startPolling() {
-        timer?.invalidate()
-        fetch()
-        timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.fetch()
-        }
-    }
-
-    private func stopPolling() {
-        timer?.invalidate()
-        timer = nil
-    }
-
-    private func fetch() {
-        guard let endpoint else { return }
-        let conn = NWConnection(to: endpoint, using: .tcp)
-        conn.stateUpdateHandler = { [weak self] state in
-            switch state {
-            case .ready:
-                self?.sendRequest(conn)
-            case .failed:
-                conn.cancel()
-            default:
-                break
+    private func fetchHistory() {
+        guard historyTask == nil, let server = selectedServer else { return }
+        let generation = generation
+        historyTask = Task { [weak self] in
+            guard let self else { return }
+            defer { if self.generation == generation { self.historyTask = nil } }
+            do {
+                let data = try await StatsTransport.get(endpoint: server.endpoint, path: "/history", deviceName: self.deviceName)
+                let payload = try JSONDecoder().decode(HistoryPayload.self, from: data)
+                let samples = try payload.samples()
+                guard !Task.isCancelled, self.generation == generation else { return }
+                self.store.mergeHistory(samples)
+                self.lastHistoryFetch = .now
+                self.historyMessage = nil
+            } catch {
+                guard !Task.isCancelled, self.generation == generation else { return }
+                self.historyMessage = "History sync will retry automatically."
+                // Avoid retrying on every poll when only the history endpoint fails.
+                self.lastHistoryFetch = Date().addingTimeInterval(-20)
             }
         }
-        conn.start(queue: .main)
     }
 
-    private func sendRequest(_ conn: NWConnection) {
-        let request = "GET / HTTP/1.1\r\nHost: mystat\r\nX-Device-Name: \(deviceName)\r\nConnection: close\r\n\r\n"
-        conn.send(content: request.data(using: .utf8), completion: .contentProcessed { error in
-            if error != nil {
-                conn.cancel()
-                return
-            }
-            conn.receive(minimumIncompleteLength: 1, maximumLength: 4096) { [weak self] data, _, _, _ in
-                defer { conn.cancel() }
-                guard let data, let text = String(data: data, encoding: .utf8) else { return }
-                guard let bodyStart = text.range(of: "\r\n\r\n") else { return }
-                let body = Data(text[bodyStart.upperBound...].utf8)
-                guard let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else { return }
-
-                if let self, !self.didFetchHistory,
-                   let path = conn.currentPath,
-                   let remote = path.remoteEndpoint {
-                    self.fetchHistoryHTTP(remote: remote)
-                }
-
-                DispatchQueue.main.async {
-                    let cpuVal = json["cpu"] as? Double ?? 0
-                    let memVal = json["mem"] as? Double ?? 0
-                    self?.cpu = cpuVal
-                    self?.mem = memVal
-                    self?.store.append(cpu: cpuVal, mem: memVal)
-                    SharedDefaults.save(cpu: cpuVal, mem: memVal, host: self?.hostName)
-
-                    if let self, Date().timeIntervalSince(self.lastWidgetReload) > 30 {
-                        WidgetCenter.shared.reloadAllTimelines()
-                        self.lastWidgetReload = Date()
-                    }
-                }
-            }
-        })
+    func retry() {
+        cancelRequests()
+        isConnected = false
+        lastHistoryFetch = .distantPast
+        guard running else { start(); return }
+        startBrowser()
+        beginPolling()
     }
 
-    private func fetchHistoryHTTP(remote: NWEndpoint) {
-        didFetchHistory = true
-
-        guard case .hostPort(let host, let port) = remote else { return }
-        let hostStr: String
-        switch host {
-        case .ipv6:
-            hostStr = "[\(host)]"
-        default:
-            hostStr = "\(host)"
-        }
-
-        guard let url = URL(string: "http://\(hostStr):\(port.rawValue)/history") else { return }
-        var request = URLRequest(url: url, timeoutInterval: 10)
-        request.setValue(deviceName, forHTTPHeaderField: "X-Device-Name")
-
-        URLSession.shared.dataTask(with: request) { [weak self] data, _, _ in
-            guard let data else { return }
-            self?.parseHistory(data)
-        }.resume()
-    }
-
-    private func parseHistory(_ body: Data) {
-        guard let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
-              let cpuArr = json["cpu"] as? [Double],
-              let memArr = json["mem"] as? [Double],
-              let interval = json["interval"] as? Double,
-              let endTs = json["endTs"] as? Double else { return }
-
-        let count = min(cpuArr.count, memArr.count)
-        guard count > 0 else { return }
-
-        var samples: [StatsSample] = []
-        samples.reserveCapacity(count)
-        let endDate = Date(timeIntervalSince1970: endTs)
-        for i in 0..<count {
-            let offset = Double(count - 1 - i) * interval
-            let ts = endDate.addingTimeInterval(-offset)
-            samples.append(StatsSample(timestamp: ts, cpu: cpuArr[i], mem: memArr[i]))
-        }
-
-        DispatchQueue.main.async { [weak self] in
-            self?.store.mergeHistory(samples)
-        }
+    private func cancelRequests() {
+        generation = UUID()
+        pollTask?.cancel()
+        pollTask = nil
+        historyTask?.cancel()
+        historyTask = nil
     }
 
     func stop() {
+        running = false
         browser?.cancel()
         browser = nil
-        stopPolling()
+        browserRetry?.cancel()
+        browserRetry = nil
+        cancelRequests()
+        isConnected = false
+        connectionMessage = "Updates paused while MyStat is in the background."
+    }
+
+    func suspend() {
+        stop()
+        WidgetCenter.shared.reloadTimelines(ofKind: SharedDefaults.widgetKind)
+        var backgroundTask = UIBackgroundTaskIdentifier.invalid
+        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Save stats history") {
+            if backgroundTask != .invalid {
+                UIApplication.shared.endBackgroundTask(backgroundTask)
+                backgroundTask = .invalid
+            }
+        }
+        Task {
+            await store.saveNow()
+            if backgroundTask != .invalid {
+                UIApplication.shared.endBackgroundTask(backgroundTask)
+                backgroundTask = .invalid
+            }
+        }
+    }
+
+    func isLive(at date: Date) -> Bool {
+        guard isConnected, let lastSuccess, let lastSample else { return false }
+        return date.timeIntervalSince(lastSuccess) < 10 && date.timeIntervalSince(lastSample) < 10
     }
 }

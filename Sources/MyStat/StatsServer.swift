@@ -1,99 +1,138 @@
 import Foundation
 import Network
+import MyStatCore
 
 final class StatsServer {
     private var listener: NWListener?
-    private(set) var cpu: Double = 0
-    private(set) var mem: Double = 0
-    private var cpuHistory: [Double] = []
-    private var memHistory: [Double] = []
-    private var interval: Double = 2.0
+    private var retry: DispatchWorkItem?
+    private var running = false
+    private var snapshot: LiveStats?
+    private var history = HistoryPayload(samples: [], interval: 2)
     private var devices: [String: Date] = [:]
-    private let deviceTimeout: TimeInterval = 10
+    private var connections: [UUID: NWConnection] = [:]
+    private var deadlines: [UUID: DispatchWorkItem] = [:]
+    var onStatusChange: ((String) -> Void)?
 
     var activeDevices: [String] {
-        let cutoff = Date().addingTimeInterval(-deviceTimeout)
-        return devices.filter { $0.value > cutoff }.keys.sorted()
+        devices = devices.filter { Date().timeIntervalSince($0.value) < 15 }
+        return devices.keys.sorted()
     }
 
     func start() {
+        guard !running else { return }
+        running = true
+        listen()
+    }
+
+    private func listen() {
+        guard running else { return }
+        retry?.cancel()
+        listener?.cancel()
         do {
             let params = NWParameters.tcp
             params.includePeerToPeer = true
-            listener = try NWListener(using: params, on: 18735)
-        } catch {
-            return
-        }
-
-        listener?.service = NWListener.Service(name: "MyStat", type: "_mystat._tcp")
-
-        listener?.newConnectionHandler = { [weak self] conn in
-            self?.handle(conn)
-        }
-
-        listener?.stateUpdateHandler = { state in
-            if case .failed(let err) = state {
-                NSLog("StatsServer listener failed: \(err)")
+            let newListener = try NWListener(using: params, on: 18735)
+            listener = newListener
+            newListener.service = NWListener.Service(name: Host.current().localizedName ?? "MyStat", type: "_mystat._tcp")
+            newListener.newConnectionHandler = { [weak self] conn in self?.handle(conn) }
+            newListener.stateUpdateHandler = { [weak self, weak newListener] state in
+                guard let self, let newListener, self.listener === newListener else { return }
+                switch state {
+                case .ready: self.onStatusChange?("iPhone sharing available")
+                case .failed(let error): self.scheduleRetry(error)
+                case .waiting: self.onStatusChange?("iPhone sharing: waiting for network")
+                default: break
+                }
             }
-        }
-
-        listener?.start(queue: .main)
+            newListener.start(queue: .main)
+        } catch { scheduleRetry(error) }
     }
 
-    func update(cpu: Double, mem: Double, cpuHistory: [Double], memHistory: [Double], interval: Double) {
-        self.cpu = cpu
-        self.mem = mem
-        self.cpuHistory = cpuHistory
-        self.memHistory = memHistory
-        self.interval = interval
+    private func scheduleRetry(_ error: Error) {
+        guard running else { return }
+        NSLog("StatsServer: %@", error.localizedDescription)
+        onStatusChange?("iPhone sharing unavailable — retrying")
+        listener?.stateUpdateHandler = nil
+        listener?.cancel()
+        listener = nil
+        retry?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.listen() }
+        retry = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: work)
+    }
+
+    func update(samples: [StatsSample], usedBytes: UInt64, totalBytes: UInt64, interval: Double) {
+        guard let latest = samples.last else { return }
+        snapshot = LiveStats(sample: latest, host: Host.current().localizedName, usedBytes: usedBytes, totalBytes: totalBytes)
+        history = HistoryPayload(samples: samples, interval: interval)
     }
 
     private func handle(_ conn: NWConnection) {
+        guard connections.count < 32 else { conn.cancel(); return }
+        let id = UUID()
+        connections[id] = conn
+        let deadline = DispatchWorkItem { [weak self] in self?.close(id) }
+        deadlines[id] = deadline
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6, execute: deadline)
         conn.start(queue: .main)
-        conn.receive(minimumIncompleteLength: 1, maximumLength: 8192) { [weak self] data, _, _, _ in
-            guard let self, let data, let request = String(data: data, encoding: .utf8) else {
-                conn.cancel()
-                return
+        receiveHeader(id, buffer: Data())
+    }
+
+    private func receiveHeader(_ id: UUID, buffer: Data) {
+        guard let conn = connections[id] else { return }
+        conn.receive(minimumIncompleteLength: 1, maximumLength: 4096) { [weak self] data, _, complete, error in
+            guard let self, self.connections[id] != nil else { return }
+            var buffer = buffer
+            buffer.append(data ?? Data())
+            guard buffer.count <= 16_384 else { self.respond(id, status: "431 Request Header Fields Too Large"); return }
+            if let end = buffer.range(of: Data("\r\n\r\n".utf8)),
+               let header = String(data: buffer[..<end.lowerBound], encoding: .utf8) {
+                self.route(id, header: header)
+            } else if complete || error != nil {
+                self.close(id)
+            } else {
+                self.receiveHeader(id, buffer: buffer)
             }
-
-            let lines = request.components(separatedBy: "\r\n")
-            let parts = (lines.first ?? "").split(separator: " ")
-            let path = parts.count >= 2 ? String(parts[1]) : "/"
-
-            for line in lines {
-                if line.lowercased().hasPrefix("x-device-name:") {
-                    let name = String(line.dropFirst("X-Device-Name:".count)).trimmingCharacters(in: .whitespaces)
-                    if !name.isEmpty { self.devices[name] = Date() }
-                }
-            }
-
-            let body: String
-            switch path {
-            case "/history":
-                body = self.historyJSON()
-            default:
-                body = self.statsJSON()
-            }
-
-            let http = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
-            conn.send(content: http.data(using: .utf8), contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
-                conn.cancel()
-            })
         }
     }
 
-    private func statsJSON() -> String {
-        "{\"cpu\":\(String(format: "%.1f", cpu)),\"mem\":\(String(format: "%.1f", mem)),\"ts\":\(Int(Date().timeIntervalSince1970))}"
+    private func route(_ id: UUID, header: String) {
+        let lines = header.components(separatedBy: "\r\n")
+        let parts = (lines.first ?? "").split(separator: " ")
+        guard parts.count == 3 else { respond(id, status: "400 Bad Request"); return }
+        guard parts[0] == "GET" else { respond(id, status: "405 Method Not Allowed"); return }
+        guard parts[1] == "/" || parts[1] == "/history" else { respond(id, status: "404 Not Found"); return }
+        for line in lines.dropFirst() where line.lowercased().hasPrefix("x-device-name:") {
+            let name = String(line.dropFirst(14)).trimmingCharacters(in: .whitespaces)
+            if !name.isEmpty { devices[String(name.prefix(128))] = .now }
+        }
+        guard let snapshot else { respond(id, status: "503 Service Unavailable"); return }
+        do {
+            let encoder = JSONEncoder()
+            let data = try parts[1] == "/history" ? encoder.encode(history) : encoder.encode(snapshot)
+            respond(id, status: "200 OK", body: data)
+        } catch { respond(id, status: "500 Internal Server Error") }
     }
 
-    private func historyJSON() -> String {
-        let cpuStr = cpuHistory.map { String(format: "%.1f", $0) }.joined(separator: ",")
-        let memStr = memHistory.map { String(format: "%.1f", $0) }.joined(separator: ",")
-        return "{\"interval\":\(interval),\"cpu\":[\(cpuStr)],\"mem\":[\(memStr)],\"endTs\":\(Int(Date().timeIntervalSince1970))}"
+    private func respond(_ id: UUID, status: String, body: Data = Data("{}".utf8)) {
+        guard let conn = connections[id] else { return }
+        var data = Data("HTTP/1.1 \(status)\r\nContent-Type: application/json\r\nContent-Length: \(body.count)\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n".utf8)
+        data.append(body)
+        conn.send(content: data, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { [weak self] _ in self?.close(id) })
+    }
+
+    private func close(_ id: UUID) {
+        deadlines.removeValue(forKey: id)?.cancel()
+        connections.removeValue(forKey: id)?.cancel()
     }
 
     func stop() {
+        running = false
+        retry?.cancel()
+        retry = nil
+        listener?.stateUpdateHandler = nil
         listener?.cancel()
         listener = nil
+        for id in Array(connections.keys) { close(id) }
     }
 }

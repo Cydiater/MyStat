@@ -26,6 +26,13 @@
     <array>
         <string>_mystat._tcp</string>
     </array>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLSchemes</key>
+            <array><string>mystat</string></array>
+        </dict>
+    </array>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
     <key>UISupportedInterfaceOrientations</key>

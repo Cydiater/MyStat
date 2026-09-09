@@ -2,75 +2,133 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var client = StatsClient()
+    @State private var showsDeskDisplay = false
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-
-            if client.isConnected {
-                ScrollView {
-                    VStack(spacing: 24) {
-                        header
-
-                        HStack(spacing: 48) {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    connectionHeader
+                    if client.latest != nil {
+                        HStack {
+                            Spacer()
                             GaugeView(title: "CPU", value: client.cpu, color: .orange)
+                            Spacer()
                             GaugeView(title: "MEM", value: client.mem, color: .teal)
+                            Spacer()
                         }
-
-                        VStack(spacing: 20) {
-                            InteractiveChartView(
-                                samples: client.store.samples,
-                                title: "CPU",
-                                color: .orange,
-                                valuePath: \.cpu
-                            )
-
-                            InteractiveChartView(
-                                samples: client.store.samples,
-                                title: "Memory",
-                                color: .teal,
-                                valuePath: \.mem
-                            )
-                        }
-                        .padding(.horizontal, 4)
+                        .padding(.vertical, 8)
                     }
-                    .padding()
+
+                    Button { showsDeskDisplay = true } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "rectangle.inset.filled.and.person.filled")
+                                .font(.title2)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Open Desk Display").font(.headline)
+                                Text("Live stats · screen stays awake").font(.caption)
+                            }
+                            Spacer()
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        }
+                        .padding(18)
+                        .foregroundStyle(.black)
+                        .background(.orange.gradient, in: RoundedRectangle(cornerRadius: 18))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("openDeskDisplay")
+
+                    if !client.store.samples.isEmpty {
+                        VStack(spacing: 24) {
+                            InteractiveChartView(samples: client.store.samples, title: "CPU", color: .orange, valuePath: \.cpu)
+                            InteractiveChartView(samples: client.store.samples, title: "Memory", color: .teal, valuePath: \.mem)
+                        }
+                        .padding(16)
+                        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 18))
+                        Text("Pinch to zoom · drag to explore · up to 24 hours saved")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let message = client.historyMessage ?? client.store.saveError {
+                        Text(message).font(.caption).foregroundStyle(.orange)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Using your iPhone as a monitor", systemImage: "info.circle").font(.subheadline.bold())
+                        Text("For continuous updates, leave Desk Display open. It works in portrait or landscape. On your Mac, turn on MyStat’s Keep Awake if you want monitoring to continue while its display sleeps.")
+                        Text("Apple StandBy widgets show snapshots. iOS chooses when they refresh; tap the refresh button for a new reading, or tap the widget to open Desk Display.")
+                    }
+                    .font(.footnote).foregroundStyle(.secondary)
+                    .padding(16)
+                    .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 18))
                 }
-                .scrollIndicators(.hidden)
-            } else {
-                VStack(spacing: 20) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .tint(.white)
-
-                    Text("Looking for MyStat\non your network\u{2026}")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-
-                    Text("Make sure MyStat is running on your Mac\nand both devices are on the same Wi-Fi.")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .multilineTextAlignment(.center)
+                .padding(20)
+                .frame(maxWidth: 700)
+                .frame(maxWidth: .infinity)
+            }
+            .background(.black)
+            .navigationTitle("MyStat")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        if let selected = client.selectedServer, !client.servers.contains(selected) {
+                            Text("\(selected.name) — unavailable")
+                        }
+                        ForEach(client.servers) { server in
+                            Button { client.select(server) } label: {
+                                if server == client.selectedServer { Label(server.name, systemImage: "checkmark") }
+                                else { Text(server.name) }
+                            }
+                        }
+                        Button("Retry Connection", systemImage: "arrow.clockwise") { client.retry() }
+                        Button("Open Settings", systemImage: "gear") { openSettings() }
+                    } label: {
+                        Image(systemName: "desktopcomputer")
+                    }
+                    .accessibilityLabel("Choose Mac and connection settings")
                 }
             }
         }
-        .onAppear { client.start() }
-        .onDisappear { client.stop() }
+        .fullScreenCover(isPresented: $showsDeskDisplay) { DeskDisplayView(client: client) }
+        .onAppear { if scenePhase == .active { client.start() } }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .background {
-                client.store.saveNow()
+            if phase == .active { client.start() }
+            if phase == .background { client.suspend() }
+        }
+        .onOpenURL { url in if url.scheme == "mystat" { showsDeskDisplay = true } }
+    }
+
+    private var connectionHeader: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let live = client.isLive(at: context.date)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Circle().fill(live ? .green : .orange).frame(width: 7, height: 7)
+                    Text(client.hostName).font(.headline)
+                    Spacer()
+                    Text(live ? "LIVE" : client.latest == nil ? "CONNECTING" : "LAST READING")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(live ? .green : .orange)
+                }
+                if let date = client.lastSample {
+                    Text("Updated \(date, style: .relative) ago")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if !live {
+                    Text(client.connectionMessage).font(.subheadline).foregroundStyle(.secondary)
+                    Text("Keep MyStat running on your Mac, use the same Wi-Fi, and allow Local Network access on your iPhone.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    HStack {
+                        Button("Retry", systemImage: "arrow.clockwise") { client.retry() }
+                        Button("Settings", systemImage: "gear") { openSettings() }
+                    }
+                    .buttonStyle(.bordered).tint(.orange)
+                }
             }
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "desktopcomputer")
-            Text(client.hostName ?? "Mac")
-        }
-        .font(.headline)
-        .foregroundStyle(.secondary)
+    private func openSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
     }
 }
