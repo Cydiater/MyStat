@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @State private var client = StatsClient()
     @State private var showsDeskDisplay = false
+    @State private var showsHelp = false
     @State private var historyMetric: HistoryMetric = .cpu
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
@@ -78,6 +79,10 @@ struct ContentView: View {
             .background(.black)
             .navigationTitle("MyStat")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Help", systemImage: "questionmark.circle") { showsHelp = true }
+                        .accessibilityIdentifier("setupHelp")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         if let selected = client.selectedServer, !client.servers.contains(selected) {
@@ -91,6 +96,10 @@ struct ContentView: View {
                         }
                         Button("Retry Connection", systemImage: "arrow.clockwise") { client.retry() }
                         Button("Open Settings", systemImage: "gear") { openSettings() }
+                        Divider()
+                        Button(client.isDemo ? "Connect My Mac" : "Explore Demo", systemImage: "play.rectangle") {
+                            if client.isDemo { client.endDemo() } else { client.showDemo() }
+                        }
                     } label: {
                         Image(systemName: "desktopcomputer")
                     }
@@ -99,6 +108,7 @@ struct ContentView: View {
             }
         }
         .fullScreenCover(isPresented: $showsDeskDisplay) { DeskDisplayView(client: client) }
+        .sheet(isPresented: $showsHelp) { SetupHelpView() }
         .onAppear { if scenePhase == .active { client.start() } }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { client.start() }
@@ -115,15 +125,20 @@ struct ContentView: View {
                     Circle().fill(live ? .green : .orange).frame(width: 7, height: 7)
                     Text(client.hostName).font(.headline)
                     Spacer()
-                    Text(live ? "LIVE" : client.latest == nil ? "CONNECTING" : "LAST READING")
+                    Text(client.isDemo ? "DEMO" : live ? "LIVE" : client.latest == nil ? "CONNECTING" : "LAST READING")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundStyle(live ? .green : .orange)
                 }
-                if let date = client.lastSample {
+                if client.isDemo {
+                    Text("Sample data · connect your Mac for real readings")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Connect My Mac") { client.endDemo() }
+                        .buttonStyle(.bordered).tint(.orange)
+                } else if let date = client.lastSample {
                     Text("Updated \(date, style: .relative) ago")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                if !live {
+                if !live && !client.isDemo {
                     Text(client.connectionMessage).font(.subheadline).foregroundStyle(.secondary)
                     Text("Keep MyStat running on your Mac, use the same Wi-Fi, and allow Local Network access on your iPhone.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -132,6 +147,16 @@ struct ContentView: View {
                         Button("Settings", systemImage: "gear") { openSettings() }
                     }
                     .buttonStyle(.bordered).tint(.orange)
+                    if client.latest == nil {
+                        HStack {
+                            Button("Get the Free Mac App") { showsHelp = true }
+                            Spacer()
+                            Button("Explore Demo") { client.showDemo() }
+                                .accessibilityIdentifier("exploreDemo")
+                        }
+                        .font(.subheadline)
+                        .tint(.teal)
+                    }
                 }
             }
         }

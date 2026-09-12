@@ -27,10 +27,13 @@ final class StatsStore {
     private var savedRevision = 0
     private var lastSave: Date = .distantPast
     private let writer = HistoryWriter()
+    private let persistent: Bool
     private let fileURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("stats_history.json")
 
-    init() {
+    init(persistent: Bool = true) {
+        self.persistent = persistent
+        guard persistent else { return }
         guard let data = try? Data(contentsOf: fileURL) else { return }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .secondsSince1970
@@ -76,6 +79,7 @@ final class StatsStore {
     }
 
     func saveNow() async {
+        guard persistent else { return }
         guard revision != savedRevision else { return }
         let snapshotRevision = revision
         let archive = HistoryArchive(serverID: serverID, samples: samples)

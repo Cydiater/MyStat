@@ -13,7 +13,9 @@ final class StatsClient {
     private(set) var connectionMessage = "Looking for your Mac…"
     private(set) var isConnected = false
     private(set) var historyMessage: String?
-    let store = StatsStore()
+    private(set) var store = StatsStore()
+    private(set) var isDemo = false
+    private var liveStore: StatsStore?
 
     var hostName: String { latest?.host ?? selectedServer?.name ?? "Your Mac" }
     var cpu: Double { latest?.cpu ?? 0 }
@@ -38,12 +40,14 @@ final class StatsClient {
     func start() {
         guard !running else { return }
         running = true
+        if isDemo { beginDemoPolling(); return }
         startBrowser()
         beginPolling()
     }
 
     private func startBrowser() {
         browser?.cancel()
+        if !isConnected { connectionMessage = "Looking for your Mac…" }
         let params = NWParameters.tcp
         params.includePeerToPeer = true
         let browser = NWBrowser(for: .bonjour(type: "_mystat._tcp", domain: nil), using: params)
@@ -82,6 +86,7 @@ final class StatsClient {
     }
 
     func select(_ server: ServerAddress) {
+        if isDemo { endDemo() }
         guard selectedServer != server else { return }
         cancelRequests()
         selectedServer = server
@@ -158,6 +163,7 @@ final class StatsClient {
     }
 
     func retry() {
+        if isDemo { endDemo(); return }
         cancelRequests()
         isConnected = false
         lastHistoryFetch = .distantPast
@@ -205,7 +211,69 @@ final class StatsClient {
     }
 
     func isLive(at date: Date) -> Bool {
+        guard !isDemo else { return false }
         guard isConnected, let lastSuccess, let lastSample else { return false }
         return date.timeIntervalSince(lastSuccess) < 10 && date.timeIntervalSince(lastSample) < 10
+    }
+
+    func showDemo() {
+        guard !isDemo else { return }
+        stop()
+        liveStore = store
+        store = StatsStore(persistent: false)
+        isDemo = true
+        start()
+    }
+
+    func endDemo() {
+        guard isDemo else { return }
+        stop()
+        isDemo = false
+        store = liveStore ?? StatsStore()
+        liveStore = nil
+        latest = SharedDefaults.load()?.stats
+        lastSuccess = nil
+        lastHistoryFetch = .distantPast
+        historyMessage = nil
+        start()
+    }
+
+    private func beginDemoPolling() {
+        connectionMessage = "Sample data. Connect your Mac for real readings."
+        historyMessage = nil
+        updateDemo()
+        pollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(2)) } catch { return }
+                guard let self, self.isDemo, self.running else { return }
+                self.updateDemo()
+            }
+        }
+    }
+
+    private func updateDemo() {
+        let now = Date()
+        let samples = (0..<91).map { offset -> StatsSample in
+            let date = now.addingTimeInterval(Double(offset - 90) * 2)
+            let phase = date.timeIntervalSince1970 / 12
+            return StatsSample(timestamp: date,
+                cpu: 32 + 12 * sin(phase) + 5 * sin(phase * 2.3),
+                mem: 61 + 2 * sin(phase / 4),
+                network: NetworkStats(downloadBytesPerSecond: 8_400_000 + 2_000_000 * sin(phase / 2),
+                                      uploadBytesPerSecond: 720_000 + 180_000 * sin(phase)),
+                power: PowerStats(onACPower: true, batteryPercent: 76, isCharging: true,
+                                  batteryWatts: 18.4, adapterWatts: 67, cycleCount: 42))
+        }
+        // A separate memory-only store keeps sample data out of real history and widgets.
+        let sample = samples.last!
+        if store.samples.isEmpty { store.mergeHistory(samples) }
+        else { store.append(sample) }
+        latest = LiveStats(sample: sample, host: "MacBook Pro", usedBytes: UInt64(sample.mem / 100 * 34_359_738_368),
+            totalBytes: 34_359_738_368,
+            system: SystemStats(uptimeSeconds: 183_600, thermalState: .nominal,
+                                diskFreeBytes: 428_000_000_000, diskTotalBytes: 1_000_000_000_000, swapUsedBytes: 268_435_456),
+            tokens: TokenUsage(inputTokens: 126_400, cachedInputTokens: 84_200, outputTokens: 18_600,
+                               updatedAt: now, dayStart: Calendar.current.startOfDay(for: now),
+                               timeZone: TimeZone.current.identifier))
     }
 }

@@ -45,7 +45,7 @@ struct DeskDisplayView: View {
             Image(systemName: "desktopcomputer").foregroundStyle(.secondary)
             Text(client.hostName).font(.headline).lineLimit(1)
             Circle().fill(live ? .green : .orange).frame(width: 6, height: 6)
-            Text(live ? "LIVE" : "OFFLINE")
+            Text(client.isDemo ? "DEMO" : live ? "LIVE" : "OFFLINE")
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundStyle(live ? .green : .orange)
             Spacer(minLength: 0)
@@ -100,17 +100,22 @@ struct DeskDisplayView: View {
     private func footer(live: Bool) -> some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                if let date = client.lastSample {
+                if client.isDemo {
+                    Text("Sample data · no Mac connected").foregroundStyle(.secondary)
+                } else if let date = client.lastSample {
                     Text("\(live ? "Updated" : "Last reading") \(date, style: .relative) ago")
                         .foregroundStyle(live ? Color.secondary : .orange)
                 } else {
                     Text("Waiting for your Mac").foregroundStyle(.orange)
                 }
-                if !live { Text(client.connectionMessage).foregroundStyle(.secondary).lineLimit(2) }
+                if !live && !client.isDemo { Text(client.connectionMessage).foregroundStyle(.secondary).lineLimit(2) }
             }
             .font(.caption)
             Spacer(minLength: 0)
-            if live {
+            if client.isDemo {
+                Button("Connect Mac") { client.endDemo() }
+                    .buttonStyle(.bordered).tint(.orange)
+            } else if live {
                 Label("Display stays awake", systemImage: "sun.max")
                     .font(.caption2).foregroundStyle(.secondary)
             } else {

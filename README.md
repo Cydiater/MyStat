@@ -2,6 +2,10 @@
 
 A small native Mac system monitor with an iPhone companion. Use the menu bar for a quick glance, or turn your iPhone into a live desk display.
 
+The iPhone App Store release is being prepared as **MyStat: Mac Desk Monitor**, with a US$5 one-time purchase and a free Mac companion. [Setup & support](https://cydiater.github.io/MyStat/support.html) · [Privacy policy](https://cydiater.github.io/MyStat/privacy.html).
+
+The iPhone app includes **Explore Demo** for trying the dashboard and Desk Display without a Mac. Sample readings are labeled DEMO, kept only in memory, and never saved into your real history or widgets. **Connect My Mac** restores the real connection.
+
 ## Readings
 
 The Mac menu and iPhone dashboard show:
@@ -56,6 +60,8 @@ open MyStat.app
 ```
 
 For development: `swift run`. The app has no Dock icon. Its menu provides larger charts with 3m / 15m / 1h ranges, iPhone sharing status, connected device names, Keep Awake, and Launch at Login.
+
+For a public Mac download, use `scripts/release-macos.sh` with `MYSTAT_SIGNING_IDENTITY` set to an installed Developer ID Application identity and `MYSTAT_NOTARY_PROFILE` set to an existing notarytool keychain profile. The script signs with hardened runtime, submits for notarization, staples and validates the ticket, checks Gatekeeper, and creates a ZIP plus SHA-256 checksum under `.build/distribution`. An ordinary `build.sh` output is for local use and is not notarized.
 
 ### iPhone and widget
 

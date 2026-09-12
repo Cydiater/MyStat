@@ -16,8 +16,13 @@ cp "$BIN" "$APP/Contents/MacOS/MyStat"
 cp "Sources/MyStat/Info.plist" "$APP/Contents/Info.plist"
 cp "Assets/AppIcon/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
-# Ad-hoc sign so Gatekeeper lets a locally-built binary run.
-codesign --force --sign - "$APP" >/dev/null
+# Local builds use an ad-hoc signature. Public downloads require Developer ID
+# signing and notarization; scripts/release-macos.sh performs the full flow.
+if [[ -n "${MYSTAT_SIGNING_IDENTITY:-}" ]]; then
+    codesign --force --options runtime --timestamp --sign "$MYSTAT_SIGNING_IDENTITY" "$APP"
+else
+    codesign --force --sign - "$APP" >/dev/null
+fi
 
 echo "Built $APP"
 echo "Run with: open $APP"
