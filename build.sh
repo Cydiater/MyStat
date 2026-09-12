@@ -14,6 +14,7 @@ mkdir -p "$APP/Contents/Resources"
 
 cp "$BIN" "$APP/Contents/MacOS/MyStat"
 cp "Sources/MyStat/Info.plist" "$APP/Contents/Info.plist"
+cp "Assets/AppIcon/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
 # Ad-hoc sign so Gatekeeper lets a locally-built binary run.
 codesign --force --sign - "$APP" >/dev/null
