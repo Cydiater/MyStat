@@ -86,7 +86,7 @@ xcodebuild -project MyStat-iOS/MyStat-iOS.xcodeproj \
 
 ## Code layout
 
-- `Assets/AppIcon/`: icon artwork, packaged Mac icon, and generation prompts. Recreate the platform sizes with `swift scripts/generate-app-icons.swift`.
+- `Assets/AppIcon/`: editable Pixelmator Pro icon, exported artwork, packaged Mac icon, and design notes. Recreate the platform sizes with `swift scripts/generate-app-icons.swift`.
 - `Sources/MyStat/`: AppKit menu bar app, Mach CPU/memory sampling, one-hour timestamped history, and Bonjour HTTP server.
 - `Sources/MyStatCore/`: Shared payloads, validation, bounded history merging, and cancellable HTTP transport. Compiled by SwiftPM and included in both iOS targets by XcodeGen.
 - `MyStat-iOS/MyStat-iOS/`: SwiftUI dashboard, Desk Display, discovery/polling, and local history persistence.

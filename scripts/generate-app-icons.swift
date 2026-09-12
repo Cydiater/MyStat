@@ -3,8 +3,8 @@ import AppKit
 import ImageIO
 import UniformTypeIdentifiers
 
-// Package the approved artwork into platform icon formats. This script only
-// resizes and encodes the originals; it does not redraw or mask the design.
+// Package artwork drawn in Pixelmator Pro into platform icon formats.
+// Only the Mac tile mask and platform-specific sizes are applied here.
 let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
 let artwork = root.appendingPathComponent("Assets/AppIcon")
 let fm = FileManager.default
@@ -34,12 +34,26 @@ func write(_ image: CGImage, size: Int, alpha: Bool, to url: URL) throws {
     guard CGImageDestinationFinalize(destination) else { throw NSError(domain: "MyStatIcons", code: 4) }
 }
 
+func macTile(from image: CGImage) throws -> CGImage {
+    guard let context = CGContext(data: nil, width: 1024, height: 1024, bitsPerComponent: 8, bytesPerRow: 4096,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+        throw NSError(domain: "MyStatIcons", code: 6)
+    }
+    let tile = CGRect(x: 100, y: 100, width: 824, height: 824)
+    context.clear(CGRect(x: 0, y: 0, width: 1024, height: 1024))
+    context.addPath(CGPath(roundedRect: tile, cornerWidth: 184, cornerHeight: 184, transform: nil))
+    context.clip()
+    context.interpolationQuality = .high
+    context.draw(image, in: tile)
+    guard let result = context.makeImage() else { throw NSError(domain: "MyStatIcons", code: 7) }
+    return result
+}
+
 do {
     let ios = try load("MyStat-iOS.png")
-    let mac = try load("MyStat-macOS.png")
-    guard [.first, .last, .premultipliedFirst, .premultipliedLast].contains(mac.alphaInfo) else {
-        throw NSError(domain: "MyStatIcons", code: 6, userInfo: [NSLocalizedDescriptionKey: "The macOS artwork needs real transparency; a baked checkerboard is not a valid icon background."])
-    }
+    let mac = try macTile(from: ios)
+    try write(mac, size: 1024, alpha: true, to: artwork.appendingPathComponent("MyStat-macOS.png"))
     let catalog = root.appendingPathComponent("MyStat-iOS/MyStat-iOS/Assets.xcassets/AppIcon.appiconset")
     try write(ios, size: 1024, alpha: false, to: catalog.appendingPathComponent("AppIcon.png"))
 
