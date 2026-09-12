@@ -1,0 +1,44 @@
+name: MyStat-Mac
+options:
+  bundleIdPrefix: com.cydiater
+  deploymentTarget:
+    macOS: "12.0"
+  xcodeVersion: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    DEVELOPMENT_TEAM: VK379AZANR
+    CODE_SIGN_STYLE: Automatic
+    ARCHS: "arm64 x86_64"
+    ONLY_ACTIVE_ARCH: false
+
+targets:
+  MyStatCore:
+    type: library.static
+    platform: macOS
+    sources:
+      - path: ../Sources/MyStatCore
+    settings:
+      base:
+        PRODUCT_MODULE_NAME: MyStatCore
+        DEFINES_MODULE: true
+        SKIP_INSTALL: true
+  MyStat:
+    type: application
+    platform: macOS
+    sources:
+      - path: ../Sources/MyStat
+        excludes: [Info.plist]
+      - path: ../Assets/AppIcon/AppIcon.icns
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cydiater.MyStat
+        PRODUCT_NAME: MyStat
+        GENERATE_INFOPLIST_FILE: false
+        INFOPLIST_FILE: ../Sources/MyStat/Info.plist
+        ENABLE_HARDENED_RUNTIME: true
+        ENABLE_APP_SANDBOX: false
+        SKIP_INSTALL: false
+    dependencies:
+      - target: MyStatCore

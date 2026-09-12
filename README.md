@@ -4,6 +4,8 @@ A small native Mac system monitor with an iPhone companion. Use the menu bar for
 
 The iPhone App Store release is being prepared as **MyStat: Mac Desk Monitor**, with a US$5 one-time purchase and a free Mac companion. [Setup & support](https://cydiater.github.io/MyStat/support.html) · [Privacy policy](https://cydiater.github.io/MyStat/privacy.html).
 
+[Download the free Mac companion 1.0.0](https://github.com/Cydiater/MyStat/releases/download/v1.0.0/MyStat-v1.0.0.zip). The universal app supports Apple silicon and Intel Macs and is signed with Developer ID and notarized by Apple.
+
 The iPhone app includes **Explore Demo** for trying the dashboard and Desk Display without a Mac. Sample readings are labeled DEMO, kept only in memory, and never saved into your real history or widgets. **Connect My Mac** restores the real connection.
 
 ## Readings
@@ -62,6 +64,29 @@ open MyStat.app
 For development: `swift run`. The app has no Dock icon. Its menu provides larger charts with 3m / 15m / 1h ranges, iPhone sharing status, connected device names, Keep Awake, and Launch at Login.
 
 For a public Mac download, use `scripts/release-macos.sh` with `MYSTAT_SIGNING_IDENTITY` set to an installed Developer ID Application identity and `MYSTAT_NOTARY_PROFILE` set to an existing notarytool keychain profile. The script signs with hardened runtime, submits for notarization, staples and validates the ticket, checks Gatekeeper, and creates a ZIP plus SHA-256 checksum under `.build/distribution`. An ordinary `build.sh` output is for local use and is not notarized.
+
+Alternatively, use the Mac Xcode project and the Apple Developer account signed into Xcode. This is the route used for version 1.0.0. The project archives both architectures and enables hardened runtime. Change the team in the project and export options if building for another account.
+
+```sh
+xcodegen generate --spec MyStat-macOS/project.yml
+xcodebuild -project MyStat-macOS/MyStat-Mac.xcodeproj -scheme MyStat \
+  -configuration Release -destination 'generic/platform=macOS' \
+  -archivePath .build/MyStat-Mac.xcarchive -allowProvisioningUpdates archive
+xcodebuild -exportArchive -archivePath .build/MyStat-Mac.xcarchive \
+  -exportPath .build/mac-notarization \
+  -exportOptionsPlist MyStat-macOS/ExportOptions.plist -allowProvisioningUpdates
+```
+
+After Apple accepts notarization, export the stapled app, verify it, and package the download:
+
+```sh
+xcodebuild -exportNotarizedApp -archivePath .build/MyStat-Mac.xcarchive \
+  -exportPath .build/mac-notarized
+codesign --verify --deep --strict .build/mac-notarized/MyStat.app
+xcrun stapler validate .build/mac-notarized/MyStat.app
+spctl --assess --type execute --verbose=2 .build/mac-notarized/MyStat.app
+ditto -c -k --keepParent .build/mac-notarized/MyStat.app .build/MyStat-v1.0.0.zip
+```
 
 ### iPhone and widget
 

@@ -6,8 +6,13 @@ App ID: 6811325325
 Listing: https://appstoreconnect.apple.com/apps/6811325325/distribution
 
 - Platform: iPhone, iOS 17+
-- Purchase: paid upfront; requested United States base price USD 5.00; localized equivalents elsewhere
-- Mac companion: free direct download, macOS 12+
+- Purchase: paid upfront; United States base price USD 5.00 saved and verified; localized equivalents elsewhere
+- Mac companion: free direct download, macOS 12+, Developer ID signed and Apple notarized
+- Mac download: https://github.com/Cydiater/MyStat/releases/download/v1.0.0/MyStat-v1.0.0.zip
+- iPhone build: 1.0.0 (2), uploaded and processed
+- Screenshots: three screenshots in the 6.9-inch display group
+- Availability: 175 countries/regions, automatic release after approval
+- Age rating: 4+
 - Name: MyStat: Mac Desk Monitor (MyStat alone was unavailable)
 - Subtitle: Your Mac stats, on your iPhone
 - Primary category: Utilities
@@ -61,6 +66,8 @@ To test actual readings: download the current Mac companion from the marketing/s
 
 The Mac shares system readings and aggregate locally recorded Codex token counts. Conversation content and credentials are not transmitted. Battery readings may be unavailable on desktop Macs or unsupported hardware.
 
-## Remaining account fields
+## Submission status
 
-Use verified account-holder details for copyright, review contact name/email/phone, content-rights declaration, age-rating questionnaire, distribution availability, and any business/tax/banking or trader requirements. Do not invent these fields. Set automatic release after approval once all release dependencies are ready.
+Paid Apps Agreement, banking, tax forms, and account compliance status are active. Copyright uses Caine (Shenzhen) Technology Co., Ltd. Content rights are set to no third-party content. Categories, age rating, distribution availability, pricing, screenshots, and product text are configured.
+
+The privacy questionnaire is saved as Data Not Collected; publishing its declaration awaits the account holder's approval. App Review contact name is Jinghui Jiao; email and phone still need to be supplied before the final version form can be saved. Build 2 has been selected, but the final save must be verified after entering those required contact details. The app has not yet been submitted for review or released on the App Store. Keep review contact details out of this public repository.

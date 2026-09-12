@@ -10,6 +10,8 @@
     <string>MyStat</string>
     <key>CFBundleDisplayName</key>
     <string>MyStat</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.utilities</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundlePackageType</key>
