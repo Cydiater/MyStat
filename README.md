@@ -2,7 +2,7 @@
 
 A small native Mac system monitor with an iPhone companion. Use the menu bar for a quick glance, or turn your iPhone into a live desk display.
 
-The iPhone App Store release is being prepared as **MyStat: Mac Desk Monitor**, with a US$5 one-time purchase and a free Mac companion. [Setup & support](https://cydiater.github.io/MyStat/support.html) · [Privacy policy](https://cydiater.github.io/MyStat/privacy.html).
+The iPhone app, **MyStat: Mac Desk Monitor**, has been submitted to Apple for review. It is set to release automatically after approval at **US$5 paid once**, with localized prices elsewhere and a free Mac companion. [Setup & support](https://cydiater.github.io/MyStat/support.html) · [Privacy policy](https://cydiater.github.io/MyStat/privacy.html).
 
 [Download the free Mac companion 1.0.0](https://github.com/Cydiater/MyStat/releases/download/v1.0.0/MyStat-v1.0.0.zip). The universal app supports Apple silicon and Intel Macs and is signed with Developer ID and notarized by Apple.
 

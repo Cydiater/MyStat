@@ -1,9 +1,10 @@
 # MyStat 1.0 — submission metadata
 
-Status: App Store Connect record created; submission still in progress.
+Status: Waiting for Review. Submitted on September 12, 2026 at 17:25 (Asia/Shanghai).
 
 App ID: 6811325325
 Listing: https://appstoreconnect.apple.com/apps/6811325325/distribution
+Submission: https://appstoreconnect.apple.com/apps/6811325325/distribution/reviewsubmissions/details/c640ad4f-402d-4a7a-a7c1-40f38c6f7b2c
 
 - Platform: iPhone, iOS 17+
 - Purchase: paid upfront; United States base price USD 5.00 saved and verified; localized equivalents elsewhere
@@ -70,4 +71,4 @@ The Mac shares system readings and aggregate locally recorded Codex token counts
 
 Paid Apps Agreement, banking, tax forms, and account compliance status are active. Copyright uses Caine (Shenzhen) Technology Co., Ltd. Content rights are set to no third-party content. Categories, age rating, distribution availability, pricing, screenshots, and product text are configured.
 
-The privacy questionnaire is saved as Data Not Collected; publishing its declaration awaits the account holder's approval. At the account holder's request, the existing Gigoter App Review contact was copied into MyStat and saved. Build 2 and the final version form are saved. App Store Connect's Add for Review check reports only the unpublished privacy declaration as a remaining requirement. The app has not yet been submitted for review or released on the App Store. Keep review contact details out of this public repository.
+The Data Not Collected privacy declaration was published with the account holder's explicit approval. At the account holder's request, the existing Gigoter App Review contact was copied into MyStat and saved. Version 1.0.0, build 2, was submitted for review on September 12, 2026. App Store Connect confirmed one item submitted. Automatic release after approval is selected, with a United States price of USD 5.00. The app is awaiting Apple's review and is not yet available on the App Store. Keep review contact details out of this public repository.
