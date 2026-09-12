@@ -1,11 +1,42 @@
 import SwiftUI
 import Charts
 
+enum HistoryMetric: String, CaseIterable, Identifiable {
+    case cpu = "CPU", memory = "Memory", download = "Download", upload = "Upload", power = "Power"
+    var id: Self { self }
+    var color: Color {
+        switch self {
+        case .cpu: return .orange
+        case .memory: return .teal
+        case .download: return .blue
+        case .upload: return .purple
+        case .power: return .green
+        }
+    }
+    var title: String { self == .power ? "Battery flow · + in / − out" : rawValue }
+    func value(_ sample: StatsSample) -> Double? {
+        switch self {
+        case .cpu: return sample.cpu
+        case .memory: return sample.mem
+        case .download: return sample.network?.downloadBytesPerSecond
+        case .upload: return sample.network?.uploadBytesPerSecond
+        case .power: return sample.power?.batteryWatts
+        }
+    }
+    func formatted(_ value: Double) -> String {
+        switch self {
+        case .cpu, .memory: return String(format: "%.1f%%", value)
+        case .download, .upload: return MetricFormat.rate(value)
+        case .power: return (value < 0 ? "−" : value > 0 ? "+" : "") + MetricFormat.watts(value)
+        }
+    }
+}
+
 struct InteractiveChartView: View {
     let samples: [StatsSample]
-    let title: String
-    let color: Color
-    let valuePath: KeyPath<StatsSample, Double>
+    let metric: HistoryMetric
+    private var title: String { metric.title }
+    private var color: Color { metric.color }
 
     @State private var duration: TimeInterval = 300
     @State private var endTime: Date = .now
@@ -39,6 +70,7 @@ struct InteractiveChartView: View {
     private struct ChartPoint: Identifiable {
         let sample: StatsSample
         let segment: Int
+        let value: Double
         var id: Date { sample.timestamp }
     }
 
@@ -50,10 +82,11 @@ struct InteractiveChartView: View {
         // doesn't appear to have supplied measurements across the missing time.
         var segment = 0
         var previous: Date?
-        let points = filtered.map { sample in
+        let points: [ChartPoint] = filtered.compactMap { sample in
+            guard let value = metric.value(sample) else { previous = nil; segment += 1; return nil }
             if let previous, sample.timestamp.timeIntervalSince(previous) > 6 { segment += 1 }
             previous = sample.timestamp
-            return ChartPoint(sample: sample, segment: segment)
+            return ChartPoint(sample: sample, segment: segment, value: value)
         }
         guard points.count > 300 else { return points }
         let step = Double(points.count - 1) / 299
@@ -61,7 +94,7 @@ struct InteractiveChartView: View {
     }
 
     private var currentValue: Double? {
-        displayPoints.last?.sample[keyPath: valuePath]
+        displayPoints.last?.value
     }
 
     var body: some View {
@@ -89,7 +122,7 @@ struct InteractiveChartView: View {
                 .foregroundStyle(color)
 
             if let val = currentValue {
-                Text(String(format: "%.1f%%", val))
+                Text(metric.formatted(val)).lineLimit(1).minimumScaleFactor(0.7)
                     .font(.system(size: 14, weight: .medium, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.8))
             }
@@ -118,11 +151,19 @@ struct InteractiveChartView: View {
         }
     }
 
+    private var yDomain: ClosedRange<Double> {
+        if metric == .cpu || metric == .memory { return 0...100 }
+        let values = displayPoints.map(\.value)
+        let floor = metric == .power ? min(0, (values.min() ?? 0) * 1.15) : 0
+        let ceiling = max(metric == .power ? 1 : 1000, (values.max() ?? 0) * 1.15)
+        return floor...ceiling
+    }
+
     private var chart: some View {
         Chart(displayPoints) { point in
             LineMark(
                 x: .value("Time", point.sample.timestamp),
-                y: .value(title, point.sample[keyPath: valuePath]),
+                y: .value(title, point.value),
                 series: .value("Segment", point.segment)
             )
             .foregroundStyle(color)
@@ -130,7 +171,7 @@ struct InteractiveChartView: View {
 
             AreaMark(
                 x: .value("Time", point.sample.timestamp),
-                y: .value(title, point.sample[keyPath: valuePath]),
+                y: .value(title, point.value),
                 series: .value("Segment", point.segment)
             )
             .foregroundStyle(
@@ -142,14 +183,19 @@ struct InteractiveChartView: View {
             )
             .interpolationMethod(.monotone)
         }
-        .chartYScale(domain: 0...100)
+        .overlay {
+            if displayPoints.isEmpty {
+                Text("No readings in this range").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .chartYScale(domain: yDomain)
         .chartXScale(domain: windowStart...effectiveEnd)
         .chartYAxis {
-            AxisMarks(values: [0, 50, 100]) { value in
+            AxisMarks(values: [yDomain.lowerBound, (yDomain.lowerBound + yDomain.upperBound) / 2, yDomain.upperBound]) { value in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
                     .foregroundStyle(.white.opacity(0.08))
                 AxisValueLabel {
-                    Text("\(value.as(Int.self) ?? 0)")
+                    Text(metric.formatted(value.as(Double.self) ?? 0))
                         .font(.system(size: 9))
                         .foregroundStyle(.white.opacity(0.3))
                 }

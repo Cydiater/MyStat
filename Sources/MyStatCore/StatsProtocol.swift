@@ -5,25 +5,32 @@ public struct StatsSample: Codable, Equatable, Sendable {
     public let timestamp: Date
     public let cpu: Double
     public let mem: Double
+    public let network: NetworkStats?
+    public let power: PowerStats?
 
-    public init(timestamp: Date, cpu: Double, mem: Double) {
+    public init(timestamp: Date, cpu: Double, mem: Double, network: NetworkStats? = nil, power: PowerStats? = nil) {
         // Canonical millisecond precision survives Date's reference-date and
         // Unix-time conversions, so JSON round trips never create duplicates.
         self.timestamp = Date(timeIntervalSince1970: (timestamp.timeIntervalSince1970 * 1000).rounded() / 1000)
         self.cpu = cpu
         self.mem = mem
+        self.network = network
+        self.power = power
     }
 
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         self.init(timestamp: try values.decode(Date.self, forKey: .timestamp),
                   cpu: try values.decode(Double.self, forKey: .cpu),
-                  mem: try values.decode(Double.self, forKey: .mem))
+                  mem: try values.decode(Double.self, forKey: .mem),
+                  network: try values.decodeIfPresent(NetworkStats.self, forKey: .network),
+                  power: try values.decodeIfPresent(PowerStats.self, forKey: .power))
     }
 
     public var isValid: Bool {
         timestamp.timeIntervalSince1970.isFinite && timestamp.timeIntervalSince1970 > 0
             && cpu.isFinite && mem.isFinite && (0...100).contains(cpu) && (0...100).contains(mem)
+            && (network?.isValid ?? true) && (power?.isValid ?? true)
     }
 }
 
@@ -53,22 +60,35 @@ public struct LiveStats: Codable, Sendable {
     public let host: String?
     public let usedBytes: UInt64?
     public let totalBytes: UInt64?
+    public let network: NetworkStats?
+    public let power: PowerStats?
+    public let system: SystemStats?
+    public let tokens: TokenUsage?
 
-    public init(sample: StatsSample, host: String?, usedBytes: UInt64? = nil, totalBytes: UInt64? = nil) {
+    public init(sample: StatsSample, host: String?, usedBytes: UInt64? = nil, totalBytes: UInt64? = nil,
+                system: SystemStats? = nil, tokens: TokenUsage? = nil) {
         cpu = sample.cpu
         mem = sample.mem
         ts = sample.timestamp.timeIntervalSince1970
         self.host = host
         self.usedBytes = usedBytes
         self.totalBytes = totalBytes
+        network = sample.network
+        power = sample.power
+        self.system = system
+        self.tokens = tokens
     }
 
-    public var sample: StatsSample { StatsSample(timestamp: Date(timeIntervalSince1970: ts), cpu: cpu, mem: mem) }
+    public var sample: StatsSample { StatsSample(timestamp: Date(timeIntervalSince1970: ts), cpu: cpu, mem: mem, network: network, power: power) }
 
     public static func decode(_ data: Data) throws -> LiveStats {
         let value = try JSONDecoder().decode(Self.self, from: data)
-        guard value.sample.isValid else { throw StatsError.invalidData }
+        guard value.isValid else { throw StatsError.invalidData }
         return value
+    }
+
+    public var isValid: Bool {
+        sample.isValid && (system?.isValid ?? true) && (tokens?.isValid ?? true)
     }
 }
 
@@ -78,6 +98,8 @@ public struct HistoryPayload: Codable, Sendable {
     public let mem: [Double]
     public let endTs: Double
     public let timestamps: [Double]?
+    public let network: [NetworkStats?]?
+    public let power: [PowerStats?]?
 
     public init(samples: [StatsSample], interval: Double) {
         self.interval = interval
@@ -85,15 +107,19 @@ public struct HistoryPayload: Codable, Sendable {
         mem = samples.map(\.mem)
         timestamps = samples.map { $0.timestamp.timeIntervalSince1970 }
         endTs = samples.last?.timestamp.timeIntervalSince1970 ?? 0
+        network = samples.contains { $0.network != nil } ? samples.map(\.network) : nil
+        power = samples.contains { $0.power != nil } ? samples.map(\.power) : nil
     }
 
     public func samples() throws -> [StatsSample] {
         guard cpu.count == mem.count, cpu.count <= 10_000, interval.isFinite, interval > 0,
-              timestamps == nil || timestamps?.count == cpu.count else { throw StatsError.invalidData }
+              timestamps == nil || timestamps?.count == cpu.count,
+              network == nil || network?.count == cpu.count,
+              power == nil || power?.count == cpu.count else { throw StatsError.invalidData }
         let result = cpu.indices.map { i in
             StatsSample(
                 timestamp: Date(timeIntervalSince1970: timestamps?[i] ?? (endTs - Double(cpu.count - 1 - i) * interval)),
-                cpu: cpu[i], mem: mem[i]
+                cpu: cpu[i], mem: mem[i], network: network?[i], power: power?[i]
             )
         }
         guard result.allSatisfy(\.isValid) else { throw StatsError.invalidData }

@@ -1,6 +1,7 @@
 import Cocoa
 import ServiceManagement
 import IOKit.pwr_mgt
+import MyStatCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
@@ -14,6 +15,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastKnownDevices: [String] = []
 
     private let monitor = StatsMonitor()
+    private let extendedMonitor = ExtendedMonitor()
+    private let tokenMonitor = TokenMonitor()
+    private let detailsView = MetricsOverviewView(frame: NSRect(x: 0, y: 0, width: 300, height: 238))
     private let statsServer = StatsServer()
     private let pollInterval: TimeInterval = 2.0
 
@@ -32,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
 
     private lazy var cpuChartView: StatsChartView = {
-        let v = StatsChartView(frame: NSRect(x: 0, y: 0, width: 260, height: 100))
+        let v = StatsChartView(frame: NSRect(x: 0, y: 0, width: 300, height: 100))
         v.title = "CPU"
         v.color = .systemOrange
         v.windowMinutes = dropdownMinutes
@@ -40,7 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }()
 
     private lazy var memChartView: StatsChartView = {
-        let v = StatsChartView(frame: NSRect(x: 0, y: 0, width: 260, height: 100))
+        let v = StatsChartView(frame: NSRect(x: 0, y: 0, width: 300, height: 100))
         v.title = "Memory"
         v.color = .systemTeal
         v.windowMinutes = dropdownMinutes
@@ -55,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             target: self,
             action: #selector(rangeChanged(_:))
         )
-        sc.frame = NSRect(x: 8, y: 4, width: 244, height: 22)
+        sc.frame = NSRect(x: 8, y: 4, width: 284, height: 22)
         sc.selectedSegment = availableRanges.firstIndex { $0.minutes == dropdownMinutes } ?? 0
         return sc
     }()
@@ -66,7 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
 
-        let rangeContainer = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 30))
+        let rangeContainer = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 30))
         rangeContainer.addSubview(rangeControl)
         let rangeItem = NSMenuItem()
         rangeItem.view = rangeContainer
@@ -78,6 +82,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         memItem.view = memChartView
         menu.addItem(cpuItem)
         menu.addItem(memItem)
+
+        menu.addItem(Self.insetSeparator())
+        let detailsItem = NSMenuItem()
+        detailsItem.view = detailsView
+        menu.addItem(detailsItem)
 
         menu.addItem(Self.insetSeparator())
         let sharing = NSMenuItem(title: "Starting iPhone sharing…", action: nil, keyEquivalent: "")
@@ -121,6 +130,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Prime the CPU sampler so the first visible tick is meaningful.
         _ = monitor.cpuUsage()
+        _ = extendedMonitor.network()
 
         refresh()
         let t = Timer(timeInterval: pollInterval, repeats: true) { [weak self] _ in
@@ -136,7 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// gutter used by the toggle items, instead of spanning the full width.
     private static func insetSeparator() -> NSMenuItem {
         let item = NSMenuItem()
-        item.view = InsetSeparatorView(frame: NSRect(x: 0, y: 0, width: 260, height: 11))
+        item.view = InsetSeparatorView(frame: NSRect(x: 0, y: 0, width: 300, height: 11))
         return item
     }
 
@@ -191,12 +201,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func refresh() {
         let cpu = monitor.cpuUsage()
         let mem = monitor.memory()
-        history.record(cpu: cpu, memory: mem.percent)
+        let network = extendedMonitor.network()
+        let power = extendedMonitor.power()
+        let system = extendedMonitor.system()
+        tokenMonitor.refresh()
+        history.record(cpu: cpu, memory: mem.percent, network: network, power: power)
         lastMemorySnapshot = mem
         statsServer.update(
             samples: history.samples, usedBytes: mem.usedBytes, totalBytes: mem.totalBytes,
-            interval: pollInterval
+            interval: pollInterval, system: system, tokens: tokenMonitor.latest
         )
+        detailsView.update(network: network, power: power, system: system, tokens: tokenMonitor.latest)
         updateDeviceMenu()
         renderViews()
     }
@@ -218,7 +233,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         guard !devices.isEmpty else { return }
 
-        let insertAt = 3
+        let insertAt = menu.items.firstIndex(where: { $0 === sharingItem }) ?? 5
         let sep = NSMenuItem.separator()
         sep.tag = deviceMenuTag
         menu.insertItem(sep, at: insertAt)

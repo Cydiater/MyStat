@@ -39,7 +39,7 @@ enum SharedDefaults {
     }
 
     static func save(_ stats: LiveStats, server: ServerAddress) {
-        guard stats.sample.isValid else { return }
+        guard stats.isValid else { return }
         update { state in
             guard state.server == server else { return }
             // Late widget requests must not overwrite a newer foreground poll.
@@ -50,7 +50,7 @@ enum SharedDefaults {
 
     static func load() -> CachedStats? {
         let state = read()
-        guard let value = state.snapshot, value.server == state.server, value.stats.sample.isValid else { return nil }
+        guard let value = state.snapshot, value.server == state.server, value.stats.isValid else { return nil }
         return value
     }
 

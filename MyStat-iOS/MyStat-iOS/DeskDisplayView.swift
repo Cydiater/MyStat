@@ -10,17 +10,19 @@ struct DeskDisplayView: View {
     var body: some View {
         GeometryReader { geometry in
             let landscape = geometry.size.width > geometry.size.height
+            let sideBySide = landscape || geometry.size.height < 700
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 let live = client.isLive(at: context.date)
-                VStack(spacing: landscape ? 14 : 24) {
+                VStack(spacing: landscape ? 10 : 16) {
                     header(live: live)
-                    let layout = landscape ? AnyLayout(HStackLayout(spacing: 18)) : AnyLayout(VStackLayout(spacing: 18))
+                    let layout = sideBySide ? AnyLayout(HStackLayout(spacing: 18)) : AnyLayout(VStackLayout(spacing: 18))
                     layout {
                         metric(title: "CPU", value: client.latest?.cpu, color: .orange,
-                               detail: "Total processor use", path: \.cpu, now: context.date, compact: landscape)
+                               detail: "Total processor use", path: \.cpu, now: context.date, compact: sideBySide)
                         metric(title: "MEMORY", value: client.latest?.mem, color: .teal,
-                               detail: memoryDetail, path: \.mem, now: context.date, compact: landscape)
+                               detail: memoryDetail, path: \.mem, now: context.date, compact: sideBySide)
                     }
+                    DeskExtrasView(stats: client.latest, compact: landscape)
                     footer(live: live)
                 }
                 .padding(landscape ? 16 : 24)
@@ -67,7 +69,7 @@ struct DeskDisplayView: View {
             Spacer(minLength: 0)
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value.map { String(format: "%.0f", $0) } ?? "—")
-                    .font(.system(size: compact ? 68 : 112, weight: .medium, design: .rounded))
+                    .font(.system(size: compact ? 52 : 88, weight: .medium, design: .rounded))
                     .monospacedDigit().minimumScaleFactor(0.45).lineLimit(1)
                 if value != nil { Text("%").font(.system(size: 32, weight: .regular, design: .rounded)).foregroundStyle(color.opacity(0.65)) }
             }
@@ -75,7 +77,7 @@ struct DeskDisplayView: View {
             Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             Spacer(minLength: 0)
             HistorySparkline(samples: Array(client.store.samples.suffix(100)), valuePath: path, color: color, now: now)
-                .frame(height: compact ? 24 : 42)
+                .frame(height: compact ? 18 : 30)
             HStack {
                 Text("3 MIN AGO")
                 Spacer()

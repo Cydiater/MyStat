@@ -25,7 +25,7 @@ private enum WidgetRefresh {
 
 struct RefreshStatsIntent: AppIntent {
     static var title: LocalizedStringResource = "Refresh Mac Stats"
-    static var description = IntentDescription("Fetch the latest CPU and memory readings from your Mac.")
+    static var description = IntentDescription("Fetch the latest system, network and power readings from your Mac.")
 
     func perform() async throws -> some IntentResult {
         _ = await WidgetRefresh.fetch()
@@ -115,9 +115,23 @@ private struct DashboardWidgetView: View {
 
     var body: some View {
         VStack(spacing: large ? 12 : 7) {
-            HStack(spacing: large ? 32 : 18) {
-                WidgetGauge(title: "CPU", value: entry.cached?.stats.cpu, color: .orange, large: large)
-                WidgetGauge(title: "MEM", value: entry.cached?.stats.mem, color: .teal, large: large)
+            HStack(spacing: large ? 20 : 18) {
+                WidgetGauge(title: "CPU", value: entry.cached?.stats.cpu, color: .orange)
+                WidgetGauge(title: "MEM", value: entry.cached?.stats.mem, color: .teal)
+                if large {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("↓ \(MetricFormat.rate(entry.cached?.stats.network?.downloadBytesPerSecond))").foregroundStyle(.blue)
+                        Text("↑ \(MetricFormat.rate(entry.cached?.stats.network?.uploadBytesPerSecond))").foregroundStyle(.purple)
+                        if let watts = entry.cached?.stats.power?.batteryWatts {
+                            Text("\(MetricFormat.watts(watts)) \(watts > 0 ? "in" : watts < 0 ? "out" : "idle")").foregroundStyle(.green)
+                        }
+                        if let tokens = entry.cached?.stats.tokens {
+                            Text("Codex \(MetricFormat.tokens(tokens.totalTokens))").foregroundStyle(.secondary)
+                        }
+                    }
+                    .font(.system(size: 11, weight: .medium, design: .rounded)).monospacedDigit()
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                }
             }
             .opacity(entry.isStale ? 0.55 : 1)
             HStack(spacing: 8) {

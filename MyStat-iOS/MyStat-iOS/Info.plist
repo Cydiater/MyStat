@@ -21,7 +21,7 @@
     <key>UILaunchScreen</key>
     <dict/>
     <key>NSLocalNetworkUsageDescription</key>
-    <string>MyStat discovers your Mac on the local network to display CPU and memory usage.</string>
+    <string>MyStat discovers your Mac on the local network to display system, network, power and local token usage readings.</string>
     <key>NSBonjourServices</key>
     <array>
         <string>_mystat._tcp</string>

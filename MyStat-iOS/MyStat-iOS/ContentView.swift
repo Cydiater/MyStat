@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @State private var client = StatsClient()
     @State private var showsDeskDisplay = false
+    @State private var historyMetric: HistoryMetric = .cpu
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
 
@@ -40,10 +41,18 @@ struct ContentView: View {
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("openDeskDisplay")
 
+                    if let stats = client.latest {
+                        ExtendedStatsView(stats: stats)
+                    }
+
                     if !client.store.samples.isEmpty {
                         VStack(spacing: 24) {
-                            InteractiveChartView(samples: client.store.samples, title: "CPU", color: .orange, valuePath: \.cpu)
-                            InteractiveChartView(samples: client.store.samples, title: "Memory", color: .teal, valuePath: \.mem)
+                            Picker("History metric", selection: $historyMetric) {
+                                ForEach(HistoryMetric.allCases) { metric in Text(metric.rawValue).tag(metric) }
+                            }
+                            .pickerStyle(.segmented)
+                            InteractiveChartView(samples: client.store.samples, metric: historyMetric)
+                                .id(historyMetric)
                         }
                         .padding(16)
                         .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 18))

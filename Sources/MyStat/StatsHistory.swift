@@ -12,8 +12,8 @@ final class StatsHistory {
         samples.reserveCapacity(capacity)
     }
 
-    func record(cpu: Double, memory: Double, timestamp: Date = .now) {
-        samples.append(StatsSample(timestamp: timestamp, cpu: min(100, max(0, cpu)), mem: min(100, max(0, memory))))
+    func record(cpu: Double, memory: Double, timestamp: Date = .now, network: NetworkStats? = nil, power: PowerStats? = nil) {
+        samples.append(StatsSample(timestamp: timestamp, cpu: min(100, max(0, cpu)), mem: min(100, max(0, memory)), network: network, power: power))
         let cutoff = timestamp.addingTimeInterval(-3600)
         if let first = samples.firstIndex(where: { $0.timestamp >= cutoff }), first > 0 { samples.removeFirst(first) }
         if samples.count > capacity { samples.removeFirst(samples.count - capacity) }

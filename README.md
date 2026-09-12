@@ -1,6 +1,20 @@
 # MyStat
 
-A small native Mac CPU/memory monitor with an iPhone companion. Use the menu bar for a quick glance, or turn your iPhone into a live desk display.
+A small native Mac system monitor with an iPhone companion. Use the menu bar for a quick glance, or turn your iPhone into a live desk display.
+
+## Readings
+
+The Mac menu and iPhone dashboard show:
+
+- **CPU and memory:** utilization, with used/total memory on the phone's Desk Display.
+- **Network:** download and upload throughput in B/s, KB/s or MB/s, sampled every two seconds. Counts physical Wi-Fi and Ethernet (`en*`) adapters, including LAN traffic. VPN, bridge, loopback and peer-to-peer interfaces are excluded to avoid counting traffic twice. A new adapter, counter reset or gap longer than ten seconds establishes a fresh baseline instead of producing a spike.
+- **Power:** AC/battery status, battery percentage, net battery charge/discharge watts, reported adapter rating and battery cycles, where the hardware exposes them. Positive battery flow means charging; negative means discharging. Battery watts are **not whole-system or wall-socket consumption**, and adapter rating is **not measured input**. Desktop Macs and unsupported sensors show unavailable readings. USB power output is not measured.
+- **System:** free space and capacity of the home volume, swap used, macOS thermal state and uptime. Storage refreshes every 30 seconds. Thermal state is macOS's assessment, not a temperature sensor reading.
+- **Codex tokens today:** input, cached input and output from readable local Codex session logs. Cached input is included in input, and reasoning is included in output; neither is added to the total twice. Counts use the Mac's local calendar day/time zone and refresh every 30 seconds. This covers recorded local sessions, not account quota, billing, remote sessions or other AI apps.
+
+Token collection incrementally reads `sessions` and `archived_sessions` under `CODEX_HOME` (when inherited by the Mac app), otherwise `~/.codex`. It needs no API key or cloud request. Only aggregate counts and their measurement date/time zone are shared with the phone; conversation content, filenames and credentials are never sent. Duplicate cumulative notifications and copied events are ignored. A first event or reset uses the reported last request rather than importing an unknown lifetime total. Local log formats can change, and incomplete/missing logs can undercount; missing or unreadable data displays “No local usage”.
+
+The dashboard's history selector supports CPU, memory, download, upload and battery flow. New fields are optional: old Mac servers, old phone clients and saved CPU/memory history remain compatible. Update both apps to see all the new readings. The two tiny menu-bar graphs remain CPU and memory; open the menu for the additional stats.
 
 ## Live desk display
 
@@ -9,7 +23,7 @@ A small native Mac CPU/memory monitor with an iPhone companion. Use the menu bar
 3. Tap **Open Desk Display**. Leave MyStat visible in portrait or landscape for live readings approximately every two seconds.
 4. If your Mac should keep monitoring while its display sleeps, enable **Keep Awake** in the Mac’s MyStat menu. This prevents idle system sleep; closing a MacBook’s lid can still put it to sleep.
 
-Desk Display shows large CPU and memory readings, memory used/total, three-minute sparklines, and the age of the last measurement. The moon button dims the interface. Auto-lock is disabled only while Desk Display is visible and active; closing it or backgrounding the app restores the previous setting.
+Desk Display shows large CPU and memory readings, memory used/total, three-minute sparklines, network speeds, battery flow and today's Codex tokens, plus free storage and thermal state in portrait. It also shows the age of the last measurement. The moon button dims the interface. Auto-lock is disabled only while Desk Display is visible and active; closing it or backgrounding the app restores the previous setting.
 
 On a lost connection, the last reading stays visible with an **OFFLINE** label and its age. Requests time out and reconnect automatically. Returning to the app fetches the Mac’s rolling history to fill gaps. The regular dashboard supports pinch-to-zoom and panning through up to 24 hours of saved history. Switching Macs clears the displayed history so different computers’ measurements are not mixed.
 
@@ -81,7 +95,7 @@ xcodebuild -project MyStat-iOS/MyStat-iOS.xcodeproj \
 
 CPU usage comes from differences in Mach host CPU tick counters. Memory use is active + wired + compressed memory divided by physical RAM; it is a utilization estimate, not macOS’s memory-pressure metric. There are no third-party runtime dependencies or cloud services. The Mac serves read-only stats over unauthenticated local HTTP (`_mystat._tcp`, port 18735); use it on a trusted local network.
 
-The Mac keeps one hour in memory. The iPhone keeps up to 24 hours / 43,200 samples in `stats_history.json`, with serialized atomic saves and retry on write failure. The widget stores only the latest snapshot and selected Mac in the App Group.
+The Mac keeps one hour in memory. The iPhone keeps up to 24 hours / 43,200 samples (including network and power) in `stats_history.json`, with serialized atomic saves and retry on write failure. The widget stores only the latest snapshot and selected Mac in the App Group. The medium widget adds network speeds, battery flow when available, and Codex tokens to its CPU/memory snapshot.
 
 ## Tests
 
@@ -89,4 +103,4 @@ The Mac keeps one hour in memory. The iPhone keeps up to 24 hours / 43,200 sampl
 swift test
 ```
 
-Coverage includes split TCP headers/bodies, truncated and malformed responses, deadlines, cancellation before/during a request, reconnecting with a new request, payload validation, legacy history, sample timestamp round trips, history deduplication and retention. Physical-device StandBy scheduling, local network permission prompts, and extended charging sessions must also be checked on an iPhone; simulator and unit tests cannot verify iOS’s real background/widget scheduling.
+Coverage includes split TCP headers/bodies, truncated and malformed responses, deadlines, cancellation before/during a request, reconnecting with a new request, payload validation, legacy history, extended sample round trips, history deduplication and retention, payload size, network resets/sleep, token deduplication and day boundaries, and partial/oversized log records. Physical-device StandBy scheduling, local network permission prompts, battery charging/discharging on a MacBook, and extended charging sessions must also be checked on real hardware; simulator and unit tests cannot verify iOS’s real background/widget scheduling.

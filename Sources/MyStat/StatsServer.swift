@@ -61,9 +61,11 @@ final class StatsServer {
         DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: work)
     }
 
-    func update(samples: [StatsSample], usedBytes: UInt64, totalBytes: UInt64, interval: Double) {
+    func update(samples: [StatsSample], usedBytes: UInt64, totalBytes: UInt64, interval: Double,
+                system: SystemStats? = nil, tokens: TokenUsage? = nil) {
         guard let latest = samples.last else { return }
-        snapshot = LiveStats(sample: latest, host: Host.current().localizedName, usedBytes: usedBytes, totalBytes: totalBytes)
+        snapshot = LiveStats(sample: latest, host: Host.current().localizedName, usedBytes: usedBytes, totalBytes: totalBytes,
+                             system: system, tokens: tokens)
         history = HistoryPayload(samples: samples, interval: interval)
     }
 
