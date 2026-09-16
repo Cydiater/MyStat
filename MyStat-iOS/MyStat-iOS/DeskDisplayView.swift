@@ -6,6 +6,7 @@ struct DeskDisplayView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var keepAlive = KeepAlive()
     @State private var dimmed = false
+    @State private var showsProcesses = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -15,14 +16,21 @@ struct DeskDisplayView: View {
                 let live = client.isLive(at: context.date)
                 VStack(spacing: landscape ? 10 : 16) {
                     header(live: live)
-                    let layout = sideBySide ? AnyLayout(HStackLayout(spacing: 18)) : AnyLayout(VStackLayout(spacing: 18))
-                    layout {
-                        metric(title: "CPU", value: client.latest?.cpu, color: .orange,
-                               detail: "Total processor use", path: \.cpu, now: context.date, compact: sideBySide)
-                        metric(title: "MEMORY", value: client.latest?.mem, color: .teal,
-                               detail: memoryDetail, path: \.mem, now: context.date, compact: sideBySide)
+                    if showsProcesses {
+                        ScrollView {
+                            TopProcessesView(snapshot: client.latest?.processes, sideBySide: landscape, compact: landscape)
+                        }
+                        .frame(maxHeight: .infinity)
+                    } else {
+                        let layout = sideBySide ? AnyLayout(HStackLayout(spacing: 18)) : AnyLayout(VStackLayout(spacing: 18))
+                        layout {
+                            metric(title: "CPU", value: client.latest?.cpu, color: .orange,
+                                   detail: "Total processor use", path: \.cpu, now: context.date, compact: sideBySide)
+                            metric(title: "MEMORY", value: client.latest?.mem, color: .teal,
+                                   detail: memoryDetail, path: \.mem, now: context.date, compact: sideBySide)
+                        }
+                        DeskExtrasView(stats: client.latest, compact: landscape)
                     }
-                    DeskExtrasView(stats: client.latest, compact: landscape)
                     footer(live: live)
                 }
                 .padding(landscape ? 16 : 24)
@@ -49,6 +57,12 @@ struct DeskDisplayView: View {
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundStyle(live ? .green : .orange)
             Spacer(minLength: 0)
+            Button { showsProcesses.toggle() } label: {
+                Image(systemName: showsProcesses ? "gauge.with.dots.needle.50percent" : "list.number")
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel(showsProcesses ? "Show overview" : "Show top processes")
+            .accessibilityIdentifier("toggleDeskProcesses")
             Button { dimmed.toggle() } label: {
                 Image(systemName: dimmed ? "sun.max" : "moon")
                     .frame(width: 44, height: 44)

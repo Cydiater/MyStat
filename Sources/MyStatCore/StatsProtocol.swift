@@ -64,9 +64,10 @@ public struct LiveStats: Codable, Sendable {
     public let power: PowerStats?
     public let system: SystemStats?
     public let tokens: TokenUsage?
+    public let processes: ProcessSnapshot?
 
     public init(sample: StatsSample, host: String?, usedBytes: UInt64? = nil, totalBytes: UInt64? = nil,
-                system: SystemStats? = nil, tokens: TokenUsage? = nil) {
+                system: SystemStats? = nil, tokens: TokenUsage? = nil, processes: ProcessSnapshot? = nil) {
         cpu = sample.cpu
         mem = sample.mem
         ts = sample.timestamp.timeIntervalSince1970
@@ -77,6 +78,7 @@ public struct LiveStats: Codable, Sendable {
         power = sample.power
         self.system = system
         self.tokens = tokens
+        self.processes = processes
     }
 
     public var sample: StatsSample { StatsSample(timestamp: Date(timeIntervalSince1970: ts), cpu: cpu, mem: mem, network: network, power: power) }
@@ -88,7 +90,7 @@ public struct LiveStats: Codable, Sendable {
     }
 
     public var isValid: Bool {
-        sample.isValid && (system?.isValid ?? true) && (tokens?.isValid ?? true)
+        sample.isValid && (system?.isValid ?? true) && (tokens?.isValid ?? true) && (processes?.isValid ?? true)
     }
 }
 

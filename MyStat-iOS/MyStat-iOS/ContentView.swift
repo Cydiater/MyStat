@@ -43,6 +43,7 @@ struct ContentView: View {
                     .accessibilityIdentifier("openDeskDisplay")
 
                     if let stats = client.latest {
+                        TopProcessesView(snapshot: stats.processes)
                         ExtendedStatsView(stats: stats)
                     }
 

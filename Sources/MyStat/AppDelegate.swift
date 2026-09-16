@@ -17,6 +17,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let monitor = StatsMonitor()
     private let extendedMonitor = ExtendedMonitor()
     private let tokenMonitor = TokenMonitor()
+    private let processMonitor = ProcessMonitor()
+    private let processMenus = ProcessMenus()
     private let detailsView = MetricsOverviewView(frame: NSRect(x: 0, y: 0, width: 300, height: 238))
     private let statsServer = StatsServer()
     private let pollInterval: TimeInterval = 2.0
@@ -87,6 +89,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let detailsItem = NSMenuItem()
         detailsItem.view = detailsView
         menu.addItem(detailsItem)
+
+        menu.addItem(processMenus.cpuItem)
+        menu.addItem(processMenus.memoryItem)
 
         menu.addItem(Self.insetSeparator())
         let sharing = NSMenuItem(title: "Starting iPhone sharing…", action: nil, keyEquivalent: "")
@@ -205,13 +210,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let power = extendedMonitor.power()
         let system = extendedMonitor.system()
         tokenMonitor.refresh()
+        processMonitor.refresh()
         history.record(cpu: cpu, memory: mem.percent, network: network, power: power)
         lastMemorySnapshot = mem
         statsServer.update(
             samples: history.samples, usedBytes: mem.usedBytes, totalBytes: mem.totalBytes,
-            interval: pollInterval, system: system, tokens: tokenMonitor.latest
+            interval: pollInterval, system: system, tokens: tokenMonitor.latest, processes: processMonitor.latest
         )
         detailsView.update(network: network, power: power, system: system, tokens: tokenMonitor.latest)
+        processMenus.update(processMonitor.latest)
         updateDeviceMenu()
         renderViews()
     }

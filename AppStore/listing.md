@@ -1,6 +1,6 @@
 # MyStat 1.0 — submission metadata
 
-Status: Waiting for Review. Submitted on September 12, 2026 at 17:25 (Asia/Shanghai).
+Status: Rejected on September 15, 2026; submission has unresolved issues. Name and subtitle corrected and saved in App Store Connect on September 16. Physical-device demonstration video still required before replying and resubmitting. See [review follow-up](review-follow-up.md).
 
 App ID: 6811325325
 Listing: https://appstoreconnect.apple.com/apps/6811325325/distribution
@@ -14,8 +14,8 @@ Submission: https://appstoreconnect.apple.com/apps/6811325325/distribution/revie
 - Screenshots: three screenshots in the 6.9-inch display group
 - Availability: 175 countries/regions, automatic release after approval
 - Age rating: 4+
-- Name: MyStat: Mac Desk Monitor (MyStat alone was unavailable)
-- Subtitle: Your Mac stats, on your iPhone
+- Name: MyStat: Desk Monitor (saved in App Store Connect; MyStat alone was unavailable)
+- Subtitle: Live CPU, memory & network
 - Primary category: Utilities
 - Secondary category: Productivity
 - Privacy URL: https://cydiater.github.io/MyStat/privacy.html
@@ -71,4 +71,4 @@ The Mac shares system readings and aggregate locally recorded Codex token counts
 
 Paid Apps Agreement, banking, tax forms, and account compliance status are active. Copyright uses Caine (Shenzhen) Technology Co., Ltd. Content rights are set to no third-party content. Categories, age rating, distribution availability, pricing, screenshots, and product text are configured.
 
-The Data Not Collected privacy declaration was published with the account holder's explicit approval. At the account holder's request, the existing Gigoter App Review contact was copied into MyStat and saved. Version 1.0.0, build 2, was submitted for review on September 12, 2026. App Store Connect confirmed one item submitted. Automatic release after approval is selected, with a United States price of USD 5.00. The app is awaiting Apple's review and is not yet available on the App Store. Keep review contact details out of this public repository.
+The Data Not Collected privacy declaration was published with the account holder's explicit approval. At the account holder's request, the existing Gigoter App Review contact was copied into MyStat and saved. Version 1.0.0, build 2, was submitted for review on September 12, 2026. App Store Connect confirmed one item submitted. Automatic release after approval is selected, with a United States price of USD 5.00. The app was rejected on September 15 under 5.2.5 (Apple product terms in the name and subtitle) and 2.1 (a physical-device demo video is needed). The name and subtitle are now corrected; the video and review reply remain pending. The app is not yet available on the App Store. Keep review contact details out of this public repository.

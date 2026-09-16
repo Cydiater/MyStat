@@ -274,6 +274,19 @@ final class StatsClient {
                                 diskFreeBytes: 428_000_000_000, diskTotalBytes: 1_000_000_000_000, swapUsedBytes: 268_435_456),
             tokens: TokenUsage(inputTokens: 126_400, cachedInputTokens: 84_200, outputTokens: 18_600,
                                updatedAt: now, dayStart: Calendar.current.startOfDay(for: now),
-                               timeZone: TimeZone.current.identifier))
+                               timeZone: TimeZone.current.identifier),
+            processes: demoProcesses(at: now))
+    }
+
+    private func demoProcesses(at date: Date) -> ProcessSnapshot {
+        let rows = [
+            ProcessUsage(pid: 101, name: "Video Editor", cpuPercent: 142 + 10 * sin(date.timeIntervalSince1970 / 8), residentBytes: 2_800_000_000),
+            ProcessUsage(pid: 102, name: "Web Browser", cpuPercent: 36, residentBytes: 1_600_000_000),
+            ProcessUsage(pid: 103, name: "Photo Editor", cpuPercent: 18, residentBytes: 3_200_000_000),
+            ProcessUsage(pid: 104, name: "Music Player", cpuPercent: 5, residentBytes: 420_000_000),
+            ProcessUsage(pid: 105, name: "MyStat", cpuPercent: 0.8, residentBytes: 48_000_000)
+        ]
+        return ProcessSnapshot(sampledAt: date, topCPU: rows,
+                               topMemory: rows.sorted { $0.residentBytes > $1.residentBytes })
     }
 }

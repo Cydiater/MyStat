@@ -2,7 +2,7 @@
 
 A small native Mac system monitor with an iPhone companion. Use the menu bar for a quick glance, or turn your iPhone into a live desk display.
 
-The iPhone app, **MyStat: Mac Desk Monitor**, has been submitted to Apple for review. It is set to release automatically after approval at **US$5 paid once**, with localized prices elsewhere and a free Mac companion. [Setup & support](https://cydiater.github.io/MyStat/support.html) · [Privacy policy](https://cydiater.github.io/MyStat/privacy.html).
+The iPhone app, **MyStat: Desk Monitor**, is not yet available on the App Store. Its initial review requires a physical-device demonstration video; the requested name and subtitle corrections have been saved. It is set to release automatically after approval at **US$5 paid once**, with localized prices elsewhere and a free Mac companion. [Setup & support](https://cydiater.github.io/MyStat/support.html) · [Privacy policy](https://cydiater.github.io/MyStat/privacy.html).
 
 [Download the free Mac companion 1.0.0](https://github.com/Cydiater/MyStat/releases/download/v1.0.0/MyStat-v1.0.0.zip). The universal app supports Apple silicon and Intel Macs and is signed with Developer ID and notarized by Apple.
 
@@ -10,9 +10,12 @@ The iPhone app includes **Explore Demo** for trying the dashboard and Desk Displ
 
 ## Readings
 
+The current source also includes top-five process rankings for the next release; these are not part of the submitted 1.0.0 (2) build or companion download above.
+
 The Mac menu and iPhone dashboard show:
 
 - **CPU and memory:** utilization, with used/total memory on the phone's Desk Display.
+- **Top processes:** separate top-five CPU and resident-memory lists, with process names and PIDs. Find them on the phone dashboard, use the list button in Desk Display, or open the Mac menu's Top CPU / Top memory submenus. Update both apps to use this feature.
 - **Network:** download and upload throughput in B/s, KB/s or MB/s, sampled every two seconds. Counts physical Wi-Fi and Ethernet (`en*`) adapters, including LAN traffic. VPN, bridge, loopback and peer-to-peer interfaces are excluded to avoid counting traffic twice. A new adapter, counter reset or gap longer than ten seconds establishes a fresh baseline instead of producing a spike.
 - **Power:** AC/battery status, battery percentage, net battery charge/discharge watts, reported adapter rating and battery cycles, where the hardware exposes them. Positive battery flow means charging; negative means discharging. Battery watts are **not whole-system or wall-socket consumption**, and adapter rating is **not measured input**. Desktop Macs and unsupported sensors show unavailable readings. USB power output is not measured.
 - **System:** free space and capacity of the home volume, swap used, macOS thermal state and uptime. Storage refreshes every 30 seconds. Thermal state is macOS's assessment, not a temperature sensor reading.
@@ -21,6 +24,10 @@ The Mac menu and iPhone dashboard show:
 Token collection incrementally reads `sessions` and `archived_sessions` under `CODEX_HOME` (when inherited by the Mac app), otherwise `~/.codex`. It needs no API key or cloud request. Only aggregate counts and their measurement date/time zone are shared with the phone; conversation content, filenames and credentials are never sent. Duplicate cumulative notifications and copied events are ignored. A first event or reset uses the reported last request rather than importing an unknown lifetime total. Local log formats can change, and incomplete/missing logs can undercount; missing or unreadable data displays “No local usage”.
 
 The dashboard's history selector supports CPU, memory, download, upload and battery flow. New fields are optional: old Mac servers, old phone clients and saved CPU/memory history remain compatible. Update both apps to see all the new readings. The two tiny menu-bar graphs remain CPU and memory; open the menu for the additional stats.
+
+Process readings are sampled on a background queue approximately every two seconds. CPU is measured between samples, with **100% representing one full CPU core**; a multithreaded process can exceed 100%. The first sample, a reused PID, a reset counter or a long sampling gap needs a new baseline before CPU is ranked. Memory is **resident bytes**, includes potentially shared pages, and differs from Activity Monitor's memory footprint. Processes that exit or cannot be read without extra privileges are omitted; this is a ranking of readable processes, not necessarily every process on the system. Names can be shortened by macOS; PIDs distinguish helpers with the same name.
+
+Only the top-five lists are shared, containing process names, PIDs, CPU percentages, resident bytes and the sampling time. MyStat does not read command arguments, executable paths or process environments. Process rankings are not added to historical charts; the latest snapshot is cached with the other readings. Old process snapshots are marked stale independently of system readings. Older companions remain usable and show process readings as unavailable.
 
 ## Live desk display
 

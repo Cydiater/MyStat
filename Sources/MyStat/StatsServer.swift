@@ -62,10 +62,10 @@ final class StatsServer {
     }
 
     func update(samples: [StatsSample], usedBytes: UInt64, totalBytes: UInt64, interval: Double,
-                system: SystemStats? = nil, tokens: TokenUsage? = nil) {
+                system: SystemStats? = nil, tokens: TokenUsage? = nil, processes: ProcessSnapshot? = nil) {
         guard let latest = samples.last else { return }
         snapshot = LiveStats(sample: latest, host: Host.current().localizedName, usedBytes: usedBytes, totalBytes: totalBytes,
-                             system: system, tokens: tokens)
+                             system: system, tokens: tokens, processes: processes)
         history = HistoryPayload(samples: samples, interval: interval)
     }
 
