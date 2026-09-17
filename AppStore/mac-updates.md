@@ -18,7 +18,7 @@ Sparkle verifies the signed feed and archive before extraction. The public Ed255
 
 `docs/appcast.xml` starts as a signed empty feed: no unreleased app is advertised. Do not edit a signed feed manually; changes invalidate its signature. The release script preserves prior entries and signs the completed feed. Back up the key before shipping because requiring verification before extraction restricts recovery if the key is lost; consult Sparkle's key-rotation documentation.
 
-Developer ID signing/notarization and Sparkle signatures are separate. Production updates require both. Local ad-hoc builds are for development and must not be published as updates.
+Developer ID signing/notarization and Sparkle signatures are separate. Production updates require both. Ad-hoc builds must not be published to the automatic update feed. Version 1.1.0 is an explicitly requested GitHub-only manual release: it is labeled as ad-hoc signed and not notarized, and the signed feed remains unchanged. The notarization checks in the release scripts still apply to future feed releases.
 
 ## Build and prepare a release
 
