@@ -3,16 +3,18 @@ import Cocoa
 /// A real view hierarchy lets charts receive mouse and keyboard input. NSMenu
 /// remains the action model so updater validation and toggle state stay shared.
 final class StatusPopover: NSObject, NSPopoverDelegate {
-    private let popover = NSPopover()
+    private let popover: NSPopover
     private let controller = NSViewController()
     private let menu: NSMenu
     private var buttons: [(NSButton, NSMenuItem)] = []
     private var itemIDs: [ObjectIdentifier] = []
+    private var customViews: [ObjectIdentifier: NSView] = [:]
     private var contentHeight: CGFloat = 0
     var onClose: (() -> Void)?
 
-    init(menu: NSMenu) {
+    init(menu: NSMenu, popover: NSPopover = NSPopover()) {
         self.menu = menu
+        self.popover = popover
         super.init()
         popover.behavior = .transient
         popover.animates = false
@@ -48,11 +50,21 @@ final class StatusPopover: NSObject, NSPopoverDelegate {
     private func rebuild() {
         buttons.removeAll()
         itemIDs = menu.items.map { ObjectIdentifier($0) }
+        customViews = customViews.filter { itemIDs.contains($0.key) }
+        for item in menu.items {
+            if let custom = item.view {
+                // NSMenu keeps resetting its custom views' origins, even when
+                // the menu is only used as an action model. Give the popover
+                // sole ownership of their layout before placing them here.
+                customViews[ObjectIdentifier(item)] = custom
+                item.view = nil
+            }
+        }
         let content = NSView(frame: .zero)
         var y: CGFloat = 8
         // AppKit coordinates increase upward, so assemble from the bottom.
         for item in menu.items.reversed() {
-            if let custom = item.view {
+            if let custom = customViews[ObjectIdentifier(item)] {
                 custom.removeFromSuperview()
                 custom.frame.origin = NSPoint(x: 0, y: y)
                 content.addSubview(custom)
