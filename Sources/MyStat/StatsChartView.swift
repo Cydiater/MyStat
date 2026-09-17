@@ -6,6 +6,15 @@ final class StatsChartView: NSView {
     var color: NSColor = .systemOrange
     var capacity: Int = 90
     var windowMinutes: Int = 3
+    var onProcessPress: (() -> Void)?
+
+    override func mouseDown(with event: NSEvent) { onProcessPress?() }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func accessibilityPerformPress() -> Bool {
+        guard let onProcessPress else { return false }
+        onProcessPress()
+        return true
+    }
 
     private(set) var values: [Double] = []
 
@@ -13,6 +22,7 @@ final class StatsChartView: NSView {
         self.values = values
         self.capacity = capacity
         self.subtitle = subtitle
+        setAccessibilityValue(subtitle)
         needsDisplay = true
     }
 
@@ -35,6 +45,12 @@ final class StatsChartView: NSView {
             .foregroundColor: color,
         ])
         titleAttr.draw(at: NSPoint(x: pad, y: headerY))
+        if onProcessPress != nil {
+            NSAttributedString(string: "Top processes", attributes: [
+                .font: NSFont.systemFont(ofSize: 9),
+                .foregroundColor: NSColor.secondaryLabelColor,
+            ]).draw(at: NSPoint(x: pad + titleAttr.size().width + 7, y: headerY + 1))
+        }
 
         let subtitleFont = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         let subtitleAttr = NSAttributedString(string: subtitle, attributes: [

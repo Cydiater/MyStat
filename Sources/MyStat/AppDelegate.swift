@@ -5,6 +5,8 @@ import MyStatCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
+    private var statusMenu: NSMenu!
+    private var statusPopover: StatusPopover!
     private var timer: Timer?
     private weak var launchAtLoginItem: NSMenuItem?
     private weak var keepAwakeItem: NSMenuItem?
@@ -18,7 +20,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let extendedMonitor = ExtendedMonitor()
     private let tokenMonitor = TokenMonitor()
     private let processMonitor = ProcessMonitor()
-    private let processMenus = ProcessMenus()
+    private lazy var processCharts = ProcessChartGroupView(cpu: cpuChartView, memory: memChartView, details: detailsView)
+    private let appUpdater = AppUpdater()
     private let detailsView = MetricsOverviewView(frame: NSRect(x: 0, y: 0, width: 300, height: 238))
     private let statsServer = StatsServer()
     private let pollInterval: TimeInterval = 2.0
@@ -71,6 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.imagePosition = .imageOnly
 
         let menu = NSMenu()
+        statusMenu = menu
 
         let rangeContainer = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 30))
         rangeContainer.addSubview(rangeControl)
@@ -78,20 +82,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         rangeItem.view = rangeContainer
         menu.addItem(rangeItem)
 
-        let cpuItem = NSMenuItem()
-        cpuItem.view = cpuChartView
-        let memItem = NSMenuItem()
-        memItem.view = memChartView
-        menu.addItem(cpuItem)
-        menu.addItem(memItem)
-
-        menu.addItem(Self.insetSeparator())
-        let detailsItem = NSMenuItem()
-        detailsItem.view = detailsView
-        menu.addItem(detailsItem)
-
-        menu.addItem(processMenus.cpuItem)
-        menu.addItem(processMenus.memoryItem)
+        let chartsItem = NSMenuItem()
+        chartsItem.view = processCharts
+        menu.addItem(chartsItem)
 
         menu.addItem(Self.insetSeparator())
         let sharing = NSMenuItem(title: "Starting iPhone sharing…", action: nil, keyEquivalent: "")
@@ -122,6 +115,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             launchAtLoginItem = launchItem
         }
         menu.addItem(Self.insetSeparator())
+        let aboutItem = NSMenuItem(title: "About MyStat", action: #selector(showAbout(_:)), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+        menu.addItem(appUpdater.checkItem)
+        menu.addItem(appUpdater.automaticItem)
+        menu.addItem(Self.insetSeparator())
         let quitItem = NSMenuItem(
             title: "Quit MyStat",
             action: #selector(NSApplication.terminate(_:)),
@@ -129,7 +128,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         menu.addItem(quitItem)
         menu.delegate = self
-        statusItem.menu = menu
+        statusPopover = StatusPopover(menu: menu)
+        statusPopover.onClose = { [weak self] in self?.processCharts.stopTracking() }
+        statusItem.button?.target = self
+        statusItem.button?.action = #selector(toggleStatusPopover(_:))
+        appUpdater.start()
 
         statsServer.start()
 
@@ -146,6 +149,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private var lastMemorySnapshot = MemorySnapshot(usedBytes: 0, totalBytes: 0)
+
+    @objc private func toggleStatusPopover(_ sender: NSStatusBarButton) {
+        menuWillOpen(statusMenu)
+        processCharts.startTracking()
+        statusPopover.toggle(relativeTo: sender)
+    }
+
+    @objc private func showAbout(_ sender: NSMenuItem) {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationName: "MyStat",
+            .applicationVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development",
+            .version: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—",
+            .credits: NSAttributedString(string: "Live system readings and process rankings for your desk.\nUpdates: github.com/Cydiater/MyStat")
+        ])
+    }
 
     /// A separator whose line is inset on the left so it clears the checkmark
     /// gutter used by the toggle items, instead of spanning the full width.
@@ -218,8 +237,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             interval: pollInterval, system: system, tokens: tokenMonitor.latest, processes: processMonitor.latest
         )
         detailsView.update(network: network, power: power, system: system, tokens: tokenMonitor.latest)
-        processMenus.update(processMonitor.latest)
+        processCharts.update(processMonitor.latest)
         updateDeviceMenu()
+        statusPopover.refresh()
         renderViews()
     }
 
@@ -234,7 +254,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard devices != lastKnownDevices else { return }
         lastKnownDevices = devices
 
-        guard let menu = statusItem.menu else { return }
+        guard let menu = statusMenu else { return }
 
         menu.items.filter { $0.tag >= deviceMenuTag }.forEach { menu.removeItem($0) }
 

@@ -13,6 +13,16 @@ if ! security find-identity -v -p codesigning | grep -Fq "\"$MYSTAT_SIGNING_IDEN
     exit 1
 fi
 
+# Fail before building/notarizing if this machine lacks the matching update key.
+swift package resolve
+sparkle_tools=".build/artifacts/sparkle/Sparkle/bin"
+sparkle_account="${MYSTAT_SPARKLE_ACCOUNT:-com.cydiater.MyStat.sparkle}"
+public_key=$("$sparkle_tools/generate_keys" --account "$sparkle_account" -p)
+[[ "$public_key" == "$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' Sources/MyStat/Info.plist)" ]] || {
+    echo "This machine needs the MyStat Sparkle signing key. See AppStore/mac-updates.md." >&2
+    exit 1
+}
+
 ./build.sh
 codesign --verify --deep --strict MyStat.app
 version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' MyStat.app/Contents/Info.plist)
@@ -29,4 +39,5 @@ spctl --assess --type execute --verbose=2 MyStat.app
 rm -f "$release_zip"
 ditto -c -k --keepParent MyStat.app "$release_zip"
 shasum -a 256 "$release_zip" > "$release_zip.sha256"
+./scripts/generate-appcast.sh "$release_zip" "AppStore/releases/$version.md"
 echo "Verified release: $release_zip"

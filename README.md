@@ -15,7 +15,7 @@ The current source also includes top-five process rankings for the next release;
 The Mac menu and iPhone dashboard show:
 
 - **CPU and memory:** utilization, with used/total memory on the phone's Desk Display.
-- **Top processes:** separate top-five CPU and resident-memory lists, with process names and PIDs. Find them on the phone dashboard, use the list button in Desk Display, or open the Mac menu's Top CPU / Top memory submenus. Update both apps to use this feature.
+- **Top processes:** separate top-five CPU and resident-memory lists. On the Mac, hover over a chart to preview its list directly below it; click the chart to pin or close it. While the dropdown is open, C and M select CPU and memory; Escape closes the panel. Long process names and PIDs are available in row tooltips. On the phone, use the dashboard or the list button in Desk Display. Update both apps to use this feature.
 - **Network:** download and upload throughput in B/s, KB/s or MB/s, sampled every two seconds. Counts physical Wi-Fi and Ethernet (`en*`) adapters, including LAN traffic. VPN, bridge, loopback and peer-to-peer interfaces are excluded to avoid counting traffic twice. A new adapter, counter reset or gap longer than ten seconds establishes a fresh baseline instead of producing a spike.
 - **Power:** AC/battery status, battery percentage, net battery charge/discharge watts, reported adapter rating and battery cycles, where the hardware exposes them. Positive battery flow means charging; negative means discharging. Battery watts are **not whole-system or wall-socket consumption**, and adapter rating is **not measured input**. Desktop Macs and unsupported sensors show unavailable readings. USB power output is not measured.
 - **System:** free space and capacity of the home volume, swap used, macOS thermal state and uptime. Storage refreshes every 30 seconds. Thermal state is macOS's assessment, not a temperature sensor reading.
@@ -58,6 +58,12 @@ Open the iPhone app and connect once before adding the widget. This grants local
 Apple’s references: [Keeping a widget up to date](https://developer.apple.com/documentation/widgetkit/keeping-a-widget-up-to-date), [Local network privacy for app extensions](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy).
 
 ## Build
+
+### Mac updates (next release)
+
+The next Mac release includes **About MyStat**, **Check for Updates…**, and an opt-in **Automatically Check for Updates** menu item. Sparkle shows release notes and handles installation/relaunch; automatic checks do not silently install updates. Existing 1.0.0 users need to replace their Mac app manually once to get the updater. The phone can identify a companion that needs upgrading for process rankings.
+
+Updates use signed archives on GitHub Releases and a signed feed on GitHub Pages. No system stats or process data are attached to update checks. See [release and signing instructions](AppStore/mac-updates.md). The updater and process rankings are not in the existing 1.0.0 download yet.
 
 ### macOS
 
@@ -132,7 +138,7 @@ xcodebuild -project MyStat-iOS/MyStat-iOS.xcodeproj \
 - `MyStat-iOS/MyStatWidget/`: Widget timeline, direct fetching, and refresh intent.
 - `Tests/MyStatCoreTests/`: Protocol and transport regression tests.
 
-CPU usage comes from differences in Mach host CPU tick counters. Memory use is active + wired + compressed memory divided by physical RAM; it is a utilization estimate, not macOS’s memory-pressure metric. There are no third-party runtime dependencies or cloud services. The Mac serves read-only stats over unauthenticated local HTTP (`_mystat._tcp`, port 18735); use it on a trusted local network.
+CPU usage comes from differences in Mach host CPU tick counters. Memory use is active + wired + compressed memory divided by physical RAM; it is a utilization estimate, not macOS’s memory-pressure metric. The Mac app uses Sparkle for updates; monitoring requires no cloud service. The Mac serves read-only stats over unauthenticated local HTTP (`_mystat._tcp`, port 18735); use it on a trusted local network.
 
 The Mac keeps one hour in memory. The iPhone keeps up to 24 hours / 43,200 samples (including network and power) in `stats_history.json`, with serialized atomic saves and retry on write failure. The widget stores only the latest snapshot and selected Mac in the App Group. The medium widget adds network speeds, battery flow when available, and Codex tokens to its CPU/memory snapshot.
 

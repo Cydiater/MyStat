@@ -53,6 +53,17 @@ public struct ServerAddress: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
+public struct CompanionInfo: Codable, Equatable, Sendable {
+    public static let processRankings = "process-rankings"
+    public let version: String
+    public let build: String
+    public let capabilities: [String]
+
+    public init(version: String, build: String, capabilities: [String]) {
+        self.version = version; self.build = build; self.capabilities = capabilities
+    }
+}
+
 public struct LiveStats: Codable, Sendable {
     public let cpu: Double
     public let mem: Double
@@ -65,9 +76,11 @@ public struct LiveStats: Codable, Sendable {
     public let system: SystemStats?
     public let tokens: TokenUsage?
     public let processes: ProcessSnapshot?
+    public let companion: CompanionInfo?
 
     public init(sample: StatsSample, host: String?, usedBytes: UInt64? = nil, totalBytes: UInt64? = nil,
-                system: SystemStats? = nil, tokens: TokenUsage? = nil, processes: ProcessSnapshot? = nil) {
+                system: SystemStats? = nil, tokens: TokenUsage? = nil, processes: ProcessSnapshot? = nil,
+                companion: CompanionInfo? = nil) {
         cpu = sample.cpu
         mem = sample.mem
         ts = sample.timestamp.timeIntervalSince1970
@@ -79,6 +92,13 @@ public struct LiveStats: Codable, Sendable {
         self.system = system
         self.tokens = tokens
         self.processes = processes
+        self.companion = companion
+    }
+
+    public var needsProcessCompanionUpdate: Bool {
+        if let companion { return !companion.capabilities.contains(CompanionInfo.processRankings) }
+        // Companions before capability reporting can still provide process rankings.
+        return processes == nil
     }
 
     public var sample: StatsSample { StatsSample(timestamp: Date(timeIntervalSince1970: ts), cpu: cpu, mem: mem, network: network, power: power) }

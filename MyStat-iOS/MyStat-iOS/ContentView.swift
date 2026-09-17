@@ -13,6 +13,21 @@ struct ContentView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     connectionHeader
+                    if client.isConnected, !client.isDemo, client.latest?.needsProcessCompanionUpdate == true {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("Update MyStat on your Mac", systemImage: "arrow.down.circle")
+                                .font(.headline).foregroundStyle(.orange)
+                            Text("Get the latest companion to see top CPU and memory processes. On your Mac, choose Check for Updates… in MyStat’s menu. If that option is missing, download the latest Mac app once.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                            if let version = client.latest?.companion?.version {
+                                Text("Connected companion: \(version)").font(.caption).foregroundStyle(.secondary)
+                            }
+                            Link("Mac download & release notes", destination: URL(string: "https://github.com/Cydiater/MyStat/releases/latest")!)
+                                .font(.footnote.bold())
+                        }
+                        .padding(16)
+                        .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 18))
+                    }
                     if client.latest != nil {
                         HStack {
                             Spacer()

@@ -16,6 +16,11 @@ struct SetupHelpView: View {
                     Text("Keep Desk Display open for live readings. Turn on Keep Awake in the Mac menu if monitoring should continue while its display sleeps.")
                     Text("Widgets show snapshots. iOS chooses refresh timing; tap Refresh for a new reading.")
                 }
+                Section("Update the Mac companion") {
+                    Text("In the Mac menu, choose Check for Updates… to see release notes and install an update. You can also enable Automatically Check for Updates; installing still requires your choice.")
+                    Text("If your Mac app has no update menu, download the latest companion once. Existing connections and history stay on your devices.")
+                    Link("Mac download & release notes", destination: URL(string: "https://github.com/Cydiater/MyStat/releases/latest")!)
+                }
                 Section("About the readings") {
                     Text("Battery watts show net charging or discharging where supported, not wall power or total Mac consumption. Adapter watts are its reported rating.")
                     Text("Codex tokens come from local session logs. They are estimates of recorded usage, not account quota or billing. MyStat is independent and is not affiliated with OpenAI.")

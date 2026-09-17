@@ -17,9 +17,25 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>1.1.0</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>2</string>
+    <key>SUFeedURL</key>
+    <string>https://cydiater.github.io/MyStat/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>donUaFKMrxl1fBjDdvCEMxxOQPLJQQlRtTkmMtlKs5c=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <false/>
+    <key>SUAutomaticallyUpdate</key>
+    <false/>
+    <key>SUAllowsAutomaticUpdates</key>
+    <false/>
+    <key>SUEnableSystemProfiling</key>
+    <false/>
+    <key>SUVerifyUpdateBeforeExtraction</key>
+    <true/>
+    <key>SURequireSignedFeed</key>
+    <true/>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
     <key>LSUIElement</key>
@@ -29,7 +45,7 @@
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSLocalNetworkUsageDescription</key>
-    <string>MyStat shares system, network, power and local token usage readings with your iPhone on the local network.</string>
+    <string>MyStat shares system, process, network, power and local token usage readings with your iPhone on the local network.</string>
     <key>NSBonjourServices</key>
     <array><string>_mystat._tcp</string></array>
 </dict>
