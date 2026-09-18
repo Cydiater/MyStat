@@ -63,7 +63,7 @@ Apple’s references: [Keeping a widget up to date](https://developer.apple.com/
 
 Mac version 1.1.0 includes **About MyStat**, **Check for Updates…**, and an opt-in **Automatically Check for Updates** menu item. Sparkle shows release notes and handles installation/relaunch; automatic checks do not silently install updates. Existing 1.0.0 users need to replace their Mac app manually once to get the updater. The phone can identify a companion that needs upgrading for process rankings.
 
-Updates use signed archives on GitHub Releases and a signed feed on GitHub Pages. No system stats or process data are attached to update checks. See [release and signing instructions](AppStore/mac-updates.md). Version 1.2.0 is a manual GitHub download and is not advertised in the automatic update feed. The submitted iPhone build is unchanged by this Mac release.
+Updates use signed archives on GitHub Releases and a signed feed on GitHub Pages. No system stats or process data are attached to update checks. See [release and signing instructions](AppStore/mac-updates.md). Version 1.2.0 appears in the signed feed as a manual GitHub download: Check for Updates shows a “Learn More…” button that opens the release page. Sparkle does not download or install this non-notarized build automatically. The submitted iPhone build is unchanged by this Mac release.
 
 ### macOS
 

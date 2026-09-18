@@ -2,12 +2,38 @@
 IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
 --><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
   <channel>
+    <item>
+      <title>MyStat 1.2.0 — GitHub download</title>
+      <sparkle:version>4</sparkle:version>
+      <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+      <pubDate>Fri, 18 Sep 2026 17:22:33 +0000</pubDate>
+      <link>https://github.com/Cydiater/MyStat/releases/tag/v1.2.0</link>
+      <description format="markdown">Choose **Learn More…** to open GitHub and download this release. Quit MyStat before replacing the app in Applications.
+
+# MyStat 1.2.0
+
+The Mac dashboard is easier to read, process lists no longer cover other readings, and Keep Awake can now keep your display on.
+
+- **Side process panels:** CPU and memory lists open to the left or right to fit your screen. Hover to preview, click to pin, or use C / M to switch and Escape to close.
+- **Process icons:** recognize apps at a glance, including their helper processes. System processes use a fallback symbol.
+- **Redesigned dashboard:** larger readings, compact metric cards, labeled percentage axes, subtle chart grids, and light/dark styling.
+- **Keep Awake:** a switch, “Active until” status, and ∞ / 15m / 30m / 45m / 1h / 4h / 8h presets. Keep display on is enabled by default; turn it off to allow display sleep while monitoring continues.
+- **Automatic expiry:** macOS enforces timed sessions. Switching off or quitting releases sleep protection. Preferences are remembered, but sessions do not resume on launch. Manual sleep and lid closure still take priority.
+
+**GitHub-only macOS release:** universal Apple silicon / Intel, macOS 12+. This build is ad-hoc signed and not Apple-notarized; macOS may block its first launch. Check for Updates offers a “Learn More…” link to this GitHub download. Installation is manual; Sparkle does not automatically download or install this build.
+
+Quit MyStat before replacing the app in Applications. This updates the Mac companion only; the iOS submission is unchanged.
+
+Validation: 30 core tests, dropdown and side-panel placement checks, Keep Awake lifecycle and real macOS assertion/expiry checks, and a universal release build. The download includes a SHA-256 checksum.
+</description>
+    </item>
     <title>MyStat Updates</title>
     <link>https://cydiater.github.io/MyStat/</link>
     <description>Signed updates for the MyStat Mac companion.</description>
     <language>en</language>
   </channel>
 </rss><!-- sparkle-signatures:
-edSignature: 54zZRY9tlXEACggVA/5DmF5MHLWFfjM/YRWttttLPDMszCMNUooUz/yshZtxpI9zBSLQT6JYm7CQXoYodO/9AA==
-length: 600
+edSignature: KiyrKoFdY+LTZVz8hD4dOiUjvCvPuZAuyH34eCFowTt/DI08qwMsAfu5q8GtxJsu7wukguPavVOhSlP5wTyhBg==
+length: 2827
 -->
