@@ -1,6 +1,5 @@
 import Cocoa
 import ServiceManagement
-import IOKit.pwr_mgt
 import MyStatCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -9,10 +8,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusPopover: StatusPopover!
     private var timer: Timer?
     private weak var launchAtLoginItem: NSMenuItem?
-    private weak var keepAwakeItem: NSMenuItem?
     private weak var sharingItem: NSMenuItem?
-    private var sleepAssertionID: IOPMAssertionID = 0
-    private var keepAwake = false
+    private let keepAwakeController = KeepAwakeController()
+    private lazy var keepAwakeView = KeepAwakeView(controller: keepAwakeController)
     private let deviceMenuTag = 100
     private var lastKnownDevices: [String] = []
 
@@ -22,7 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let processMonitor = ProcessMonitor()
     private lazy var processCharts = ProcessChartGroupView(cpu: cpuChartView, memory: memChartView, details: detailsView)
     private let appUpdater = AppUpdater()
-    private let detailsView = MetricsOverviewView(frame: NSRect(x: 0, y: 0, width: 300, height: 238))
+    private let detailsView = MetricsOverviewView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: DashboardStyle.detailsHeight))
     private let statsServer = StatsServer()
     private let pollInterval: TimeInterval = 2.0
 
@@ -41,17 +39,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
 
     private lazy var cpuChartView: StatsChartView = {
-        let v = StatsChartView(frame: NSRect(x: 0, y: 0, width: 300, height: 100))
+        let v = StatsChartView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: DashboardStyle.chartHeight))
         v.title = "CPU"
-        v.color = .systemOrange
+        v.color = DashboardStyle.orange
         v.windowMinutes = dropdownMinutes
         return v
     }()
 
     private lazy var memChartView: StatsChartView = {
-        let v = StatsChartView(frame: NSRect(x: 0, y: 0, width: 300, height: 100))
+        let v = StatsChartView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: DashboardStyle.chartHeight))
         v.title = "Memory"
-        v.color = .systemTeal
+        v.color = DashboardStyle.blue
         v.windowMinutes = dropdownMinutes
         return v
     }()
@@ -64,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             target: self,
             action: #selector(rangeChanged(_:))
         )
-        sc.frame = NSRect(x: 8, y: 4, width: 284, height: 22)
+        sc.frame = NSRect(x: 8, y: 4, width: DashboardStyle.width - 16, height: 22)
         sc.selectedSegment = availableRanges.firstIndex { $0.minutes == dropdownMinutes } ?? 0
         return sc
     }()
@@ -76,7 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         statusMenu = menu
 
-        let rangeContainer = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 30))
+        let rangeContainer = NSView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: 30))
         rangeContainer.addSubview(rangeControl)
         let rangeItem = NSMenuItem()
         rangeItem.view = rangeContainer
@@ -92,15 +90,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(sharing)
         sharingItem = sharing
         statsServer.onStatusChange = { [weak self] text in self?.sharingItem?.title = text }
-        let keepAwakeMenuItem = NSMenuItem(
-            title: "Keep Awake",
-            action: #selector(toggleKeepAwake(_:)),
-            keyEquivalent: ""
-        )
-        keepAwakeMenuItem.target = self
-        keepAwakeMenuItem.state = keepAwake ? .on : .off
+        let keepAwakeMenuItem = NSMenuItem()
+        keepAwakeMenuItem.view = keepAwakeView
         menu.addItem(keepAwakeMenuItem)
-        keepAwakeItem = keepAwakeMenuItem
 
         if #available(macOS 13.0, *) {
             let enabled = SMAppService.mainApp.status == .enabled
@@ -170,7 +162,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// gutter used by the toggle items, instead of spanning the full width.
     private static func insetSeparator() -> NSMenuItem {
         let item = NSMenuItem()
-        item.view = InsetSeparatorView(frame: NSRect(x: 0, y: 0, width: 300, height: 11))
+        item.view = InsetSeparatorView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: 11))
         return item
     }
 
@@ -190,27 +182,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             alert.runModal()
         }
         sender.state = service.status == .enabled ? .on : .off
-    }
-
-    @objc private func toggleKeepAwake(_ sender: NSMenuItem) {
-        if keepAwake {
-            IOPMAssertionRelease(sleepAssertionID)
-            sleepAssertionID = 0
-            keepAwake = false
-        } else {
-            var assertionID: IOPMAssertionID = 0
-            let result = IOPMAssertionCreateWithName(
-                kIOPMAssertionTypePreventUserIdleSystemSleep as CFString,
-                IOPMAssertionLevel(kIOPMAssertionLevelOn),
-                "MyStat keeping Mac awake" as CFString,
-                &assertionID
-            )
-            if result == kIOReturnSuccess {
-                sleepAssertionID = assertionID
-                keepAwake = true
-            }
-        }
-        sender.state = keepAwake ? .on : .off
     }
 
     @objc private func rangeChanged(_ sender: NSSegmentedControl) {
@@ -246,7 +217,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         timer?.invalidate()
         statsServer.stop()
-        if keepAwake { IOPMAssertionRelease(sleepAssertionID) }
+        keepAwakeController.stop()
     }
 
     private func updateDeviceMenu() {
@@ -276,7 +247,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func renderViews() {
-        let cpu = history.cpu.last ?? 0
         let mem = lastMemorySnapshot
         let barSamples = max(2, Int((statusBarMinutes * 60.0 / pollInterval).rounded()))
         let barCpu = Array(history.cpu.suffix(barSamples))
@@ -294,16 +264,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         cpuChartView.update(
             values: dropCpu,
             capacity: dropSamples,
-            subtitle: String(format: "%.1f%%", cpu)
+            subtitle: "System utilization"
         )
         memChartView.update(
             values: dropMem,
             capacity: dropSamples,
             subtitle: String(
-                format: "%@ / %@ GB  (%.0f%%)",
+                format: "%@ / %@ GB",
                 ByteFormat.gb(mem.usedBytes),
-                ByteFormat.gb(mem.totalBytes),
-                mem.percent
+                ByteFormat.gb(mem.totalBytes)
             )
         )
     }
@@ -311,6 +280,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 extension AppDelegate: NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
+        keepAwakeController.refresh()
         if #available(macOS 13.0, *), let item = launchAtLoginItem {
             item.state = SMAppService.mainApp.status == .enabled ? .on : .off
         }

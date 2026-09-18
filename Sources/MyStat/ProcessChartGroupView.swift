@@ -1,13 +1,24 @@
 import Cocoa
 import MyStatCore
 
-/// Both charts share one fixed-size container. The overlay covers the content
-/// below its chart without moving the other controls.
+/// Charts stay in the dashboard; their process list lives in a sibling window.
 final class ProcessChartGroupView: NSView {
     enum Metric { case cpu, memory }
     private let cpu: StatsChartView
     private let memory: StatsChartView
-    private let panel = ProcessPanelView(frame: NSRect(x: 8, y: 0, width: 284, height: 222))
+    private let panel = ProcessPanelView(frame: NSRect(x: 0, y: 0, width: 284, height: 222))
+    private lazy var panelWindow: NSPanel = {
+        let window = NSPanel(contentRect: panel.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = true
+        window.hidesOnDeactivate = true
+        window.becomesKeyOnlyIfNeeded = true
+        window.contentView = panel
+        window.collectionBehavior = [.transient, .fullScreenAuxiliary]
+        return window
+    }()
     private var snapshot: ProcessSnapshot?
     private(set) var displayedMetric: Metric?
     private(set) var pinned = false
@@ -21,13 +32,11 @@ final class ProcessChartGroupView: NSView {
     init(cpu: StatsChartView, memory: StatsChartView, details: NSView) {
         self.cpu = cpu
         self.memory = memory
-        super.init(frame: NSRect(x: 0, y: 0, width: 300, height: 450))
-        cpu.frame.origin = NSPoint(x: 0, y: 350)
-        memory.frame.origin = NSPoint(x: 0, y: 250)
-        details.frame.origin = .zero
+        super.init(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: DashboardStyle.detailsHeight + DashboardStyle.chartHeight * 2))
+        cpu.frame = NSRect(x: 0, y: DashboardStyle.detailsHeight + DashboardStyle.chartHeight, width: DashboardStyle.width, height: DashboardStyle.chartHeight)
+        memory.frame = NSRect(x: 0, y: DashboardStyle.detailsHeight, width: DashboardStyle.width, height: DashboardStyle.chartHeight)
+        details.frame = NSRect(x: 0, y: 0, width: DashboardStyle.width, height: DashboardStyle.detailsHeight)
         for view in [details, memory, cpu] { addSubview(view) }
-        panel.isHidden = true
-        addSubview(panel)
         for (chart, metric, shortcut) in [(cpu, Metric.cpu, "C"), (memory, .memory, "M")] {
             chart.onProcessPress = { [weak self] in self?.toggle(metric) }
             chart.setAccessibilityElement(true)
@@ -96,7 +105,8 @@ final class ProcessChartGroupView: NSView {
             let point = convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
             suppressedMetric = cpu.frame.contains(point) ? .cpu : memory.frame.contains(point) ? .memory : nil
         }
-        panel.isHidden = true
+        panelWindow.parent?.removeChildWindow(panelWindow)
+        panelWindow.orderOut(nil)
         displayedMetric = nil
         pinned = false
         candidate = nil
@@ -105,21 +115,44 @@ final class ProcessChartGroupView: NSView {
     }
 
     private func show(_ metric: Metric, pinned: Bool) {
-        let chart = metric == .cpu ? cpu : memory
-        panel.frame.origin.y = chart.frame.minY - panel.frame.height
+        guard positionPanel(for: metric), let window else { return }
         displayedMetric = metric
         self.pinned = pinned
         outsideSince = nil
         panel.update(snapshot, metric: metric, pinned: pinned)
-        panel.isHidden = false
+        if panelWindow.parent !== window {
+            panelWindow.parent?.removeChildWindow(panelWindow)
+            window.addChildWindow(panelWindow, ordered: .above)
+        }
+        panelWindow.orderFront(nil)
+    }
+
+    private func positionPanel(for metric: Metric) -> Bool {
+        guard let window, let screen = window.screen else { return false }
+        let chart = metric == .cpu ? cpu : memory
+        guard !chart.visibleRect.isEmpty else { return false }
+        let chartRect = window.convertToScreen(chart.convert(chart.bounds, to: nil))
+        guard let frame = ProcessPanelPlacement.frame(parent: window.frame, chart: chartRect,
+            screen: screen.visibleFrame, size: NSSize(width: 284, height: 222)) else { return false }
+        panelWindow.appearance = window.effectiveAppearance
+        if panelWindow.frame != frame { panelWindow.setFrame(frame, display: true) }
+        return true
     }
 
     private func trackPointer() {
-        guard let window, window.isVisible, !pinned else { return }
+        guard let window, window.isVisible else { return }
+        if let displayedMetric, !positionPanel(for: displayedMetric) { dismiss() }
+        guard !pinned else { return }
         let point = convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
         let now = ProcessInfo.processInfo.systemUptime
-        // The panel obscures part of the other chart, so it wins hit testing.
-        if !panel.isHidden && panel.frame.contains(point) && visibleRect.contains(point) { outsideSince = nil; return }
+        if displayedMetric != nil {
+            let floating = panelWindow.frame
+            let pointer = NSEvent.mouseLocation
+            let gapX = floating.minX >= window.frame.maxX ? window.frame.maxX : floating.maxX
+            let bridge = NSRect(x: gapX, y: floating.minY, width: 8, height: floating.height)
+            // Crossing the small gap or reading the list keeps a preview open.
+            if floating.contains(pointer) || bridge.contains(pointer) { outsideSince = nil; return }
+        }
         let hovered: Metric? = !visibleRect.contains(point) ? nil : cpu.frame.contains(point) ? .cpu : memory.frame.contains(point) ? .memory : nil
         if let suppressedMetric, hovered == suppressedMetric { return }
         suppressedMetric = nil
@@ -134,59 +167,70 @@ final class ProcessChartGroupView: NSView {
     }
 }
 
-private final class ProcessPanelView: NSVisualEffectView {
+private final class ProcessPanelView: NSView {
     var onClose: (() -> Void)?
     private let heading = NSTextField(labelWithString: "")
     private let note = NSTextField(labelWithString: "")
     private let footer = NSTextField(labelWithString: "")
+    private let iconProvider = ProcessIconProvider()
+    private var icons: [NSImageView] = []
     private var names: [NSTextField] = []
     private var amounts: [NSTextField] = []
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        material = .popover
-        blendingMode = .withinWindow
-        state = .active
         wantsLayer = true
         layer?.cornerRadius = 10
-        layer?.borderWidth = 1
-        layer?.borderColor = NSColor.separatorColor.cgColor
         heading.font = .systemFont(ofSize: 12, weight: .semibold)
         heading.frame = NSRect(x: 12, y: 194, width: 225, height: 18)
+        heading.autoresizingMask = [.width]
         addSubview(heading)
         let close = NSButton(image: NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Close process panel")!, target: self, action: #selector(closePanel))
         close.isBordered = false
         close.frame = NSRect(x: 252, y: 192, width: 22, height: 22)
+        close.autoresizingMask = [.minXMargin]
         addSubview(close)
         note.font = .systemFont(ofSize: 9)
         note.textColor = .secondaryLabelColor
         note.frame = NSRect(x: 12, y: 176, width: 260, height: 14)
+        note.autoresizingMask = [.width]
         addSubview(note)
         for index in 0..<5 {
+            let icon = NSImageView(frame: NSRect(x: 12, y: 146 - index * 26, width: 16, height: 16))
+            icon.imageScaling = .scaleProportionallyUpOrDown
+            icon.contentTintColor = .secondaryLabelColor
+            icon.setAccessibilityElement(false)
             let name = NSTextField(labelWithString: "")
             name.font = .systemFont(ofSize: 11)
             name.lineBreakMode = .byTruncatingTail
-            name.frame = NSRect(x: 12, y: 145 - index * 26, width: 174, height: 19)
+            name.frame = NSRect(x: 34, y: 145 - index * 26, width: 152, height: 19)
             let amount = NSTextField(labelWithString: "")
             amount.font = .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
             amount.alignment = .right
             amount.frame = NSRect(x: 188, y: 145 - index * 26, width: 84, height: 19)
-            addSubview(name); addSubview(amount)
+            name.autoresizingMask = [.width]
+            amount.autoresizingMask = [.minXMargin]
+            addSubview(icon); addSubview(name); addSubview(amount)
+            icons.append(icon)
             names.append(name); amounts.append(amount)
         }
         footer.font = .systemFont(ofSize: 9)
         footer.textColor = .secondaryLabelColor
         footer.frame = NSRect(x: 12, y: 10, width: 260, height: 15)
+        footer.autoresizingMask = [.width]
         addSubview(footer)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    override func draw(_ dirtyRect: NSRect) {
+        DashboardStyle.card(bounds)
+    }
     @objc private func closePanel() { onClose?() }
 
     func update(_ snapshot: ProcessSnapshot?, metric: ProcessChartGroupView.Metric, pinned: Bool) {
         let cpu = metric == .cpu
         heading.stringValue = cpu ? "Top CPU processes" : "Top memory processes"
-        heading.textColor = cpu ? .systemOrange : .systemTeal
+        heading.textColor = cpu ? DashboardStyle.orange : DashboardStyle.blue
         note.stringValue = cpu ? "100% = one core · readable processes" : "Resident memory · readable processes"
         let stale = snapshot?.isStale(at: .now) == true
         footer.stringValue = stale ? "Readings are stale · waiting for a new sample" : pinned ? "Pinned · Esc or × to close · C / M to switch" : "Click the chart to pin · C / M to switch"
@@ -195,6 +239,10 @@ private final class ProcessPanelView: NSVisualEffectView {
             names[index].textColor = stale ? .secondaryLabelColor : .labelColor
             amounts[index].textColor = stale ? .secondaryLabelColor : .labelColor
             guard index < rows.count else {
+                icons[index].image = nil
+                icons[index].isHidden = true
+                names[index].frame.origin.x = 12
+                names[index].frame.size.width = bounds.width - 110
                 names[index].stringValue = index == 0 ? (snapshot == nil ? "Readings unavailable" : cpu ? "Measuring CPU…" : "No readable processes") : ""
                 names[index].toolTip = nil
                 names[index].setAccessibilityLabel(nil)
@@ -202,6 +250,11 @@ private final class ProcessPanelView: NSVisualEffectView {
                 continue
             }
             let row = rows[index]
+            icons[index].image = iconProvider.icon(for: row.pid)
+            icons[index].isHidden = false
+            icons[index].alphaValue = stale ? 0.5 : 1
+            names[index].frame.origin.x = 34
+            names[index].frame.size.width = bounds.width - 132
             names[index].stringValue = row.name
             names[index].toolTip = "\(row.name) · PID \(row.pid)"
             names[index].setAccessibilityLabel("\(row.name), process \(row.pid)")

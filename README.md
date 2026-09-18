@@ -4,18 +4,18 @@ A small native Mac system monitor with an iPhone companion. Use the menu bar for
 
 The iPhone app, **MyStat: Desk Monitor**, is not yet available on the App Store. Its initial review requires a physical-device demonstration video; the requested name and subtitle corrections have been saved. It is set to release automatically after approval at **US$5 paid once**, with localized prices elsewhere and a free Mac companion. [Setup & support](https://cydiater.github.io/MyStat/support.html) · [Privacy policy](https://cydiater.github.io/MyStat/privacy.html).
 
-[Download the free Mac companion 1.1.1](https://github.com/Cydiater/MyStat/releases/download/v1.1.1/MyStat-v1.1.1.zip). The universal app supports Apple silicon and Intel Macs. This GitHub-only 1.1.1 build is ad-hoc signed and **not notarized**; macOS may block its first launch. The previous [1.0.0 download](https://github.com/Cydiater/MyStat/releases/tag/v1.0.0) remains Developer ID signed and notarized.
+[Download the free Mac companion 1.2.0](https://github.com/Cydiater/MyStat/releases/download/v1.2.0/MyStat-v1.2.0.zip). The universal app supports Apple silicon and Intel Macs. This GitHub-only 1.2.0 build is ad-hoc signed and **not notarized**; macOS may block its first launch. The previous [1.0.0 download](https://github.com/Cydiater/MyStat/releases/tag/v1.0.0) remains Developer ID signed and notarized.
 
 The iPhone app includes **Explore Demo** for trying the dashboard and Desk Display without a Mac. Sample readings are labeled DEMO, kept only in memory, and never saved into your real history or widgets. **Connect My Mac** restores the real connection.
 
 ## Readings
 
-The Mac companion 1.1.1 includes top-five process rankings and fixes the overlapping dropdown layout in 1.1.0. The iPhone implementation is in the current source but is not part of the submitted iOS 1.0.0 (2) build.
+The Mac companion 1.2.0 adds side process panels with app icons, redesigned charts and metric cards, and timed Keep Awake controls that can keep the display on. The iPhone implementation is in the current source but is not part of the submitted iOS 1.0.0 (2) build.
 
 The Mac menu and iPhone dashboard show:
 
 - **CPU and memory:** utilization, with used/total memory on the phone's Desk Display.
-- **Top processes:** separate top-five CPU and resident-memory lists. On the Mac, hover over a chart to preview its list directly below it; click the chart to pin or close it. While the dropdown is open, C and M select CPU and memory; Escape closes the panel. Long process names and PIDs are available in row tooltips. On the phone, use the dashboard or the list button in Desk Display. Update both apps to use this feature.
+- **Top processes:** separate top-five CPU and resident-memory lists. On the Mac, hover over a chart to preview its list; click the chart to pin or close it. While the dropdown is open, C and M select CPU and memory; Escape closes the panel. Long process names and PIDs are available in row tooltips. On the phone, use the dashboard or the list button in Desk Display. Update both apps to use this feature.
 - **Network:** download and upload throughput in B/s, KB/s or MB/s, sampled every two seconds. Counts physical Wi-Fi and Ethernet (`en*`) adapters, including LAN traffic. VPN, bridge, loopback and peer-to-peer interfaces are excluded to avoid counting traffic twice. A new adapter, counter reset or gap longer than ten seconds establishes a fresh baseline instead of producing a spike.
 - **Power:** AC/battery status, battery percentage, net battery charge/discharge watts, reported adapter rating and battery cycles, where the hardware exposes them. Positive battery flow means charging; negative means discharging. Battery watts are **not whole-system or wall-socket consumption**, and adapter rating is **not measured input**. Desktop Macs and unsupported sensors show unavailable readings. USB power output is not measured.
 - **System:** free space and capacity of the home volume, swap used, macOS thermal state and uptime. Storage refreshes every 30 seconds. Thermal state is macOS's assessment, not a temperature sensor reading.
@@ -27,14 +27,14 @@ The dashboard's history selector supports CPU, memory, download, upload and batt
 
 Process readings are sampled on a background queue approximately every two seconds. CPU is measured between samples, with **100% representing one full CPU core**; a multithreaded process can exceed 100%. The first sample, a reused PID, a reset counter or a long sampling gap needs a new baseline before CPU is ranked. Memory is **resident bytes**, includes potentially shared pages, and differs from Activity Monitor's memory footprint. Processes that exit or cannot be read without extra privileges are omitted; this is a ranking of readable processes, not necessarily every process on the system. Names can be shortened by macOS; PIDs distinguish helpers with the same name.
 
-Only the top-five lists are shared, containing process names, PIDs, CPU percentages, resident bytes and the sampling time. MyStat does not read command arguments, executable paths or process environments. Process rankings are not added to historical charts; the latest snapshot is cached with the other readings. Old process snapshots are marked stale independently of system readings. Older companions remain usable and show process readings as unavailable.
+Only the top-five lists are shared, containing process names, PIDs, CPU percentages, resident bytes and the sampling time. MyStat does not read command arguments or process environments. Mac version 1.2.0 shows app icons beside process names, using executable paths locally to identify helper processes' owning apps; icons and paths are not sent to the phone or stored in history. Processes without an app icon use a system-process symbol. The Mac opens the list beside the dashboard, choosing left or right to fit the screen, and uses compact dashboard cards with labeled chart axes. Process rankings are not added to historical charts; the latest snapshot is cached with the other readings. Old process snapshots are marked stale independently of system readings. Older companions remain usable and show process readings as unavailable.
 
 ## Live desk display
 
 1. Run MyStat on your Mac and iPhone, on the same local network. Allow **Local Network** access when iOS asks.
 2. The iPhone discovers your Mac automatically. Use the computer menu to choose a different Mac if needed.
 3. Tap **Open Desk Display**. Leave MyStat visible in portrait or landscape for live readings approximately every two seconds.
-4. If your Mac should keep monitoring while its display sleeps, enable **Keep Awake** in the Mac’s MyStat menu. This prevents idle system sleep; closing a MacBook’s lid can still put it to sleep.
+4. Enable **Keep Awake** in the Mac’s MyStat menu to prevent idle sleep. Version 1.2.0 includes a switch, duration presets (∞, 15m, 30m, 45m, 1h, 4h, 8h), and an “Active until” status. **Keep display on** is enabled by default; uncheck it to allow display sleep while monitoring continues. Selecting a duration while active restarts the timer; changing the display option preserves the deadline. Sessions end automatically at their deadline, when switched off, or when MyStat quits. Preferences are remembered, but sessions do not restart on launch. macOS also enforces timed expiry independently of the app's UI timer. Manual sleep, lid closure, and low-battery sleep still take priority.
 
 Desk Display shows large CPU and memory readings, memory used/total, three-minute sparklines, network speeds, battery flow and today's Codex tokens, plus free storage and thermal state in portrait. It also shows the age of the last measurement. The moon button dims the interface. Auto-lock is disabled only while Desk Display is visible and active; closing it or backgrounding the app restores the previous setting.
 
@@ -63,7 +63,7 @@ Apple’s references: [Keeping a widget up to date](https://developer.apple.com/
 
 Mac version 1.1.0 includes **About MyStat**, **Check for Updates…**, and an opt-in **Automatically Check for Updates** menu item. Sparkle shows release notes and handles installation/relaunch; automatic checks do not silently install updates. Existing 1.0.0 users need to replace their Mac app manually once to get the updater. The phone can identify a companion that needs upgrading for process rankings.
 
-Updates use signed archives on GitHub Releases and a signed feed on GitHub Pages. No system stats or process data are attached to update checks. See [release and signing instructions](AppStore/mac-updates.md). Version 1.1.1 is a manual GitHub download and is not advertised in the automatic update feed. The submitted iPhone build is unchanged by this Mac release.
+Updates use signed archives on GitHub Releases and a signed feed on GitHub Pages. No system stats or process data are attached to update checks. See [release and signing instructions](AppStore/mac-updates.md). Version 1.2.0 is a manual GitHub download and is not advertised in the automatic update feed. The submitted iPhone build is unchanged by this Mac release.
 
 ### macOS
 
@@ -74,11 +74,11 @@ Requires macOS 12+ and an installed Swift/Xcode toolchain. Launch at Login is av
 open MyStat.app
 ```
 
-Run `swift test` for core tests and `scripts/test-status-popover.sh` on macOS for dropdown layout regression checks, including connected-device changes.
+Run `swift test` for core tests and `scripts/test-status-popover.sh` on macOS for dropdown layout regression checks, including connected-device changes. Run `scripts/test-keep-awake.sh` to verify session lifecycle and real macOS sleep assertions, including timed expiry.
 
 For development: `swift run`. The app has no Dock icon. Its menu provides larger charts with 3m / 15m / 1h ranges, iPhone sharing status, connected device names, Keep Awake, and Launch at Login.
 
-For a notarized Mac download, use `scripts/release-macos.sh` with `MYSTAT_SIGNING_IDENTITY` set to an installed Developer ID Application identity and `MYSTAT_NOTARY_PROFILE` set to an existing notarytool keychain profile. The script signs with hardened runtime, submits for notarization, staples and validates the ticket, checks Gatekeeper, and creates a ZIP plus SHA-256 checksum under `.build/distribution`. An ordinary `build.sh` output is ad-hoc signed and not notarized. Version 1.1.1 uses that build for its explicitly labeled GitHub-only download.
+For a notarized Mac download, use `scripts/release-macos.sh` with `MYSTAT_SIGNING_IDENTITY` set to an installed Developer ID Application identity and `MYSTAT_NOTARY_PROFILE` set to an existing notarytool keychain profile. The script signs with hardened runtime, submits for notarization, staples and validates the ticket, checks Gatekeeper, and creates a ZIP plus SHA-256 checksum under `.build/distribution`. An ordinary `build.sh` output is ad-hoc signed and not notarized. Version 1.2.0 uses that build for its explicitly labeled GitHub-only download.
 
 Alternatively, use the Mac Xcode project and the Apple Developer account signed into Xcode. This is the route used for version 1.0.0. The project archives both architectures and enables hardened runtime. Change the team in the project and export options if building for another account.
 

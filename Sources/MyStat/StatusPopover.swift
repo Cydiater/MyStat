@@ -28,7 +28,7 @@ final class StatusPopover: NSObject, NSPopoverDelegate {
         refresh()
         NSApp.activate(ignoringOtherApps: true)
         let screenHeight = button.window?.screen?.visibleFrame.height ?? NSScreen.main?.visibleFrame.height ?? 800
-        popover.contentSize = NSSize(width: 300, height: min(contentHeight, screenHeight - 60))
+        popover.contentSize = NSSize(width: DashboardStyle.width, height: min(contentHeight, screenHeight - 60))
         if let scroll = controller.view as? NSScrollView {
             scroll.documentView?.scroll(NSPoint(x: 0, y: max(0, contentHeight - popover.contentSize.height)))
         }
@@ -60,7 +60,7 @@ final class StatusPopover: NSObject, NSPopoverDelegate {
                 item.view = nil
             }
         }
-        let content = NSView(frame: .zero)
+        let content = DashboardCanvas(frame: .zero)
         var y: CGFloat = 8
         // AppKit coordinates increase upward, so assemble from the bottom.
         for item in menu.items.reversed() {
@@ -70,7 +70,7 @@ final class StatusPopover: NSObject, NSPopoverDelegate {
                 content.addSubview(custom)
                 y += custom.frame.height
             } else if item.isSeparatorItem {
-                let line = NSBox(frame: NSRect(x: 12, y: y + 5, width: 276, height: 1))
+                let line = NSBox(frame: NSRect(x: 12, y: y + 5, width: DashboardStyle.width - 24, height: 1))
                 line.boxType = .separator
                 content.addSubview(line)
                 y += 12
@@ -81,14 +81,14 @@ final class StatusPopover: NSObject, NSPopoverDelegate {
                 button.font = .menuFont(ofSize: 12)
                 button.keyEquivalent = item.keyEquivalent
                 button.keyEquivalentModifierMask = item.keyEquivalentModifierMask
-                button.frame = NSRect(x: 8, y: y, width: 284, height: 23)
+                button.frame = NSRect(x: 8, y: y, width: DashboardStyle.width - 16, height: 23)
                 button.tag = buttons.count
                 buttons.append((button, item))
                 content.addSubview(button)
                 y += 23
             }
         }
-        content.frame.size = NSSize(width: 300, height: y + 8)
+        content.frame.size = NSSize(width: DashboardStyle.width, height: y + 8)
         contentHeight = content.frame.height
         let scroll = NSScrollView(frame: content.frame)
         scroll.drawsBackground = false
@@ -97,7 +97,7 @@ final class StatusPopover: NSObject, NSPopoverDelegate {
         scroll.documentView = content
         controller.view = scroll
         let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
-        popover.contentSize = NSSize(width: 300, height: min(contentHeight, screenHeight - 60))
+        popover.contentSize = NSSize(width: DashboardStyle.width, height: min(contentHeight, screenHeight - 60))
         content.scroll(NSPoint(x: 0, y: max(0, contentHeight - popover.contentSize.height)))
     }
 
@@ -110,6 +110,17 @@ final class StatusPopover: NSObject, NSPopoverDelegate {
         }
         NSApp.sendAction(action, to: item.target, from: item)
         refresh()
+    }
+
+    func popoverShouldClose(_ popover: NSPopover) -> Bool {
+        // A click on our nonactivating child process panel belongs to this
+        // dropdown, even though its window lies outside the popover's bounds.
+        let type = NSApp.currentEvent?.type
+        if type == .leftMouseDown || type == .rightMouseDown {
+            let children = controller.view.window?.childWindows ?? []
+            if children.contains(where: { $0.isVisible && $0.frame.contains(NSEvent.mouseLocation) }) { return false }
+        }
+        return true
     }
 
     func popoverDidClose(_ notification: Notification) { onClose?() }
