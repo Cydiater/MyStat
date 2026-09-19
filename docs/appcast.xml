@@ -5,6 +5,31 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <item>
+            <title>1.5.0</title>
+            <pubDate>Sat, 19 Sep 2026 20:37:59 +0800</pubDate>
+            <link>https://cydiater.github.io/MyStat/</link>
+            <sparkle:version>9</sparkle:version>
+            <sparkle:shortVersionString>1.5.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# MyStat 1.5.0
+
+Native macOS menus and a smaller Keep Awake indicator.
+
+- The dropdown now uses AppKit's native menu, with real cascading submenus for CPU Processes, Memory Processes, Details, iPhone, and Settings.
+- macOS handles submenu placement, selection highlights, checkmarks, keyboard navigation, and dismissal. Charts and Keep Awake controls remain available in the overview.
+- Process lists use native rows with app icons and live usage values. Readings and countdowns continue updating while a menu is open.
+- Keep Awake now adds just 23 points to the menu bar: a small coffee icon and a progress bar that shrinks as time runs out. Hover for the exact remaining time; untimed sessions show ∞.
+- Duration and display options remain under the Keep Awake heading. Changing duration restarts the timer; changing the display option preserves its deadline.
+
+Developer ID signed and Apple-notarized. Universal Apple silicon / Intel app, macOS 12+.
+
+Install through **Settings → Check for Updates… → Install Update → Install and Relaunch**. Saved preferences are preserved. Relaunching ends an active Keep Awake session; enable it again after the update if needed.
+
+This release updates the Mac companion only.
+]]></description>
+            <enclosure url="https://github.com/Cydiater/MyStat/releases/download/v1.5.0/MyStat-v1.5.0.zip" length="1478202" type="application/octet-stream" sparkle:edSignature="vYddzqxpoJXV/Cj9cgB4ztHOi2cx4gef96jLMJ9kqbciUlrh5P2/v1IVJbT261GNVzY4E6fYthQRkskxNsfZBA=="/>
+        </item>
+        <item>
             <title>1.4.0</title>
             <pubDate>Sat, 19 Sep 2026 19:55:01 +0800</pubDate>
             <link>https://cydiater.github.io/MyStat/</link>
@@ -135,6 +160,6 @@ Validation: 30 core tests, dropdown and side-panel placement checks, Keep Awake 
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: VkvLP8KB24XK+/NP5Hkf1u5bgXrPeHAG3wSrHpwQX+y1G0+f4541LqrhcEVDecHwAE98Qj2YbAAoJgzLI0vrAw==
-length: 10694
+edSignature: oJsx7173rSqmpbVPw6T3Ua4UCHiiIk/XtemsbSQ5q5QZG1Yc8VZ63V6FrYZU2yL6N6tgKFEHVxC90rtRXkI0Cg==
+length: 12654
 -->
