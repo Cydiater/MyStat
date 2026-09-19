@@ -11,7 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private weak var sharingSection: NSMenuItem?
     private let sharingMenu = NSMenu(title: "iPhone")
     private let keepAwakeController = KeepAwakeController()
-    private lazy var keepAwakeView = KeepAwakeView(controller: keepAwakeController)
+    private lazy var keepAwakeMenu = KeepAwakeMenu(controller: keepAwakeController)
     private let deviceMenuTag = 100
     private var lastKnownDevices: [String]?
 
@@ -100,16 +100,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(processes.item)
         }
 
-        let keepAwakeMenuItem = NSMenuItem()
-        keepAwakeMenuItem.view = keepAwakeView
-        menu.addItem(keepAwakeMenuItem)
+        menu.addItem(.separator())
+        menu.addItem(keepAwakeMenu.item)
         keepAwakeController.onChange = { [weak self] in
             guard let self else { return }
-            self.keepAwakeView.refresh()
+            self.keepAwakeMenu.refresh()
             self.renderStatusBar()
         }
 
-        menu.addItem(.separator())
         let detailsMenu = NSMenu(title: "Details")
         detailsMenu.autoenablesItems = false
         let detailsItem = NSMenuItem()

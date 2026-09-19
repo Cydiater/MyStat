@@ -14,6 +14,10 @@ for list in [cpu, memory] {
     precondition(list.item.view == nil && list.item.submenu === list.menu, "Process navigation must use a native submenu item")
     let row = list.menu.items.first!
     precondition(!row.isHidden && row.image != nil && row.toolTip!.contains("PID \(getpid())"))
+    if #available(macOS 27.0, *) {
+        precondition(list.menu.items.prefix(5).allSatisfy { $0.preferredImageVisibility == .visible },
+                     "Process icons must stay visible instead of following AppKit's automatic hiding policy")
+    }
     precondition(list.menu.items.dropFirst().prefix(4).allSatisfy(\.isHidden), "Hide empty process slots")
     if #available(macOS 14.0, *) {
         precondition(row.title == "Menu Test" && row.badge?.stringValue == (list === cpu ? "24.5%" : MetricFormat.bytes(process.residentBytes)))
@@ -30,7 +34,12 @@ print("PASS: native process menus, value badges, icons, empty/stale readings, st
 
 final class FakeAssertions: SleepAssertionProviding {
     var next: IOPMAssertionID = 1
-    func create(display: Bool, timeout: TimeInterval) throws -> IOPMAssertionID { defer { next += 1 }; return next }
+    var fails = false
+    func create(display: Bool, timeout: TimeInterval) throws -> IOPMAssertionID {
+        if fails { throw NSError(domain: "Test", code: 1, userInfo: [NSLocalizedDescriptionKey: "Assertion unavailable"]) }
+        defer { next += 1 }
+        return next
+    }
     func release(_ id: IOPMAssertionID) {}
 }
 final class Actions: NSObject, NSMenuItemValidation {
@@ -49,11 +58,61 @@ let domain = "com.cydiater.MyStat.native-menu-tests.\(UUID().uuidString)"
 let defaults = UserDefaults(suiteName: domain)!
 defer { defaults.removePersistentDomain(forName: domain) }
 var now = Date()
-let awakeController = KeepAwakeController(assertions: FakeAssertions(), defaults: defaults, now: { now })
-let awake = KeepAwakeView(controller: awakeController)
+let assertions = FakeAssertions()
+let awakeController = KeepAwakeController(assertions: assertions, defaults: defaults, now: { now })
+let awake = KeepAwakeMenu(controller: awakeController)
 var awakeUpdates = 0
 awakeController.onChange = { [weak awake] in awake?.refresh(); awakeUpdates += 1 }
-awakeController.selectDuration(15)
+precondition(awake.item.view == nil && awake.item.submenu === awake.menu)
+precondition(awake.menu.items.allSatisfy { $0.view == nil && $0.submenu == nil }, "Keep Awake must use native rows in one submenu")
+func chooseAwake(_ title: String) {
+    let index = awake.menu.items.firstIndex { $0.title == title }!
+    awake.menu.performActionForItem(at: index)
+}
+func awakeChoice(_ title: String) -> NSMenuItem { awake.menu.items.first { $0.title == title }! }
+func expectAwakeSummary(_ summary: String) {
+    if #available(macOS 14.0, *) { precondition(awake.item.badge?.stringValue == summary) }
+    else { precondition(awake.item.title == "Keep Awake — \(summary)") }
+}
+expectAwakeSummary("Off")
+chooseAwake("30 Minutes")
+precondition(!awakeController.isActive && defaults.integer(forKey: "keepAwake.durationMinutes") == 30,
+             "Choosing a duration while off must save it without starting a session")
+precondition(awakeChoice("30 Minutes").state == .on && awakeChoice("1 Hour").state == .off)
+chooseAwake("Keep Awake")
+precondition(awakeController.isActive && awake.item.state == .on && awakeChoice("Keep Awake").state == .on)
+let deadline = awakeController.endsAt
+now += 10
+awakeController.refresh()
+expectAwakeSummary("29:50")
+chooseAwake("Keep Display On")
+precondition(!awakeController.keepsDisplayOn && awakeChoice("Keep Display On").state == .off && awakeController.endsAt == deadline,
+             "Changing the display option must preserve the deadline")
+assertions.fails = true
+// Exercise error presentation without opening a modal alert in this test.
+awakeController.selectDuration(60)
+expectAwakeSummary("Error")
+precondition(awake.item.toolTip == "Assertion unavailable" && awake.item.state == .on)
+precondition(awakeChoice("30 Minutes").state == .on && awakeChoice("1 Hour").state == .off,
+             "A failed duration change must preserve the selected preset")
+assertions.fails = false
+chooseAwake("15 Minutes")
+precondition(awakeController.endsAt == now.addingTimeInterval(900), "Changing duration must restart the active session")
+expectAwakeSummary("15:00")
+chooseAwake("Keep Awake")
+precondition(!awakeController.isActive && awake.item.state == .off)
+expectAwakeSummary("Off")
+chooseAwake("Until Turned Off")
+chooseAwake("Keep Awake")
+precondition(awakeController.isActive && awakeController.endsAt == nil && awakeChoice("Until Turned Off").state == .on)
+expectAwakeSummary("∞")
+chooseAwake("15 Minutes")
+now += 900
+awake.menuWillOpen(awake.menu)
+precondition(!awakeController.isActive && awakeChoice("Keep Awake").state == .off,
+             "Opening the submenu must clear an expired session")
+expectAwakeSummary("Off")
+print("PASS: native Keep Awake cascade, toggle, duration checkmarks, saved preferences, display deadline, errors, and expiry")
 let menu = NSMenu(title: "MyStat")
 menu.autoenablesItems = false
 menu.minimumWidth = DashboardStyle.width
@@ -67,9 +126,7 @@ chartItem.view = chart
 menu.addItem(chartItem)
 menu.addItem(cpu.item)
 menu.addItem(memory.item)
-let awakeItem = NSMenuItem()
-awakeItem.view = awake
-menu.addItem(awakeItem)
+menu.addItem(awake.item)
 menu.addItem(.separator())
 let actions = Actions()
 let settings = NSMenu(title: "Settings")
@@ -100,24 +157,19 @@ defer { window.orderOut(nil) }
 awakeController.setActive(true)
 let updatesBeforeTracking = awakeUpdates
 var mounted = false
-var expanded = false
-var collapsed = false
+var countdownUpdated = false
 let timer = Timer(timeInterval: 0.1, repeats: true) { _ in
     guard chart.window != nil else { return }
-    precondition(chart.enclosingMenuItem === chartItem && awake.enclosingMenuItem === awakeItem,
-                 "AppKit must own the custom-view layout")
+    precondition(chart.enclosingMenuItem === chartItem, "AppKit must own the custom-view layout")
     precondition(chart.frame.height == DashboardStyle.chartHeight)
     if !mounted {
         mounted = true
-        let heading = awake.subviews.compactMap { $0 as? NSButton }.first { $0.title == "Keep Awake" }!
-        heading.performClick(nil)
-        expanded = awake.isExpanded && awake.frame.height == 146
-        heading.performClick(nil)
-        collapsed = !awake.isExpanded && awake.frame.height == 58
         now += 10
     }
     // Wait for the actual one-second Keep Awake timer in menu-tracking mode.
     if awakeUpdates > updatesBeforeTracking {
+        expectAwakeSummary("14:50")
+        countdownUpdated = true
         menu.cancelTrackingWithoutAnimation()
     }
 }
@@ -128,8 +180,8 @@ menu.popUp(positioning: nil, at: .zero, in: anchor)
 timer.invalidate()
 timeout.invalidate()
 awakeController.stop()
-precondition(mounted && expanded && collapsed, "Keep Awake options must work in the native menu")
+precondition(mounted && countdownUpdated, "Keep Awake's parent status must update during menu tracking")
 precondition(awakeUpdates > updatesBeforeTracking + 1, "Countdown must keep ticking while the menu tracks")
 precondition(lifecycle.opened == 1 && lifecycle.closed == 1)
-precondition(chartItem.view === chart && awakeItem.view === awake, "Closing must preserve custom views")
-print("PASS: native menu lifecycle, custom chart layout, Keep Awake expansion, and countdown during menu tracking")
+precondition(chartItem.view === chart && awake.item.submenu === awake.menu, "Closing must preserve charts and submenus")
+print("PASS: native menu lifecycle, custom chart layout, and Keep Awake status during menu tracking")

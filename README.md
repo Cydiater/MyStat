@@ -25,7 +25,7 @@ Token collection incrementally reads `sessions` and `archived_sessions` under `C
 
 The dashboard's history selector supports CPU, memory, download, upload and battery flow. New fields are optional: old Mac servers, old phone clients and saved CPU/memory history remain compatible. Update both apps to see all the new readings. The two tiny menu-bar graphs remain CPU and memory; open the menu for the additional stats.
 
-Mac companion 1.5.0 uses a native AppKit **NSMenu** for the dropdown. CPU and memory charts remain visible, with **CPU Processes**, **Memory Processes**, **Details**, **iPhone**, and **Settings** opening real cascading submenus. macOS provides their material, selection highlights, arrows, checkmarks, placement, and keyboard navigation. The charts and compact **Keep Awake** controls are custom views hosted by the native menu; click the Keep Awake heading to reveal duration and display options. Live readings and countdowns continue while a menu is open.
+Mac companion 1.5.0 uses a native AppKit **NSMenu** for the dropdown. CPU and memory charts remain visible, with **CPU Processes**, **Memory Processes**, **Details**, **iPhone**, and **Settings** opening real cascading submenus. macOS provides their material, selection highlights, arrows, checkmarks, placement, and keyboard navigation. The charts are custom views hosted by the native menu. In the current source, **Keep Awake** is a single native submenu row showing Off or the remaining time. Its submenu contains the on/off control, duration presets, and **Keep Display On**, with standard checkmarks. Live readings and countdowns continue while a menu is open.
 
 Keep Awake uses an 18-point coffee icon and progress bar that shrinks as time runs out, adding only 23 points including spacing. Hover for the exact remaining time; untimed sessions use a compact ∞ indicator. The indicator disappears when Keep Awake ends.
 
@@ -71,14 +71,14 @@ Updates use signed archives on GitHub Releases and a signed feed on GitHub Pages
 
 ### macOS
 
-The app runs on macOS 12+. Building the current source requires Xcode 26+ for the Liquid Glass APIs. Launch at Login is available on macOS 13+.
+The app runs on macOS 12+. Building the current source requires Xcode 27+ for the native menu image-visibility API. Launch at Login is available on macOS 13+.
 
 ```sh
 ./build.sh     # Universal arm64 + x86_64 release, app bundle, ad-hoc signature
 open MyStat.app
 ```
 
-Run `swift test` for core tests and `scripts/test-status-menu.sh` on macOS for native-menu regression checks, including process value badges, empty/stale readings, stable live updates, action validation, nested keyboard shortcuts, custom-view layout, Keep Awake expansion, and countdown updates during menu tracking. Run `scripts/test-keep-awake.sh` to verify session lifecycle, countdown ticks and boundaries, and real macOS sleep assertions, including timed expiry.
+Run `swift test` for core tests and `scripts/test-status-menu.sh` on macOS for native-menu regression checks, including process value badges, empty/stale readings, stable live updates, action validation, nested keyboard shortcuts, chart layout, Keep Awake submenu actions and checkmarks, saved durations, display-option deadline preservation, errors, expiry, and countdown updates during menu tracking. Run `scripts/test-keep-awake.sh` to verify session lifecycle, countdown ticks and boundaries, and real macOS sleep assertions, including timed expiry.
 
 For development: `swift run`. The app has no Dock icon. Its menu provides larger charts with 3m / 15m / 1h ranges, iPhone sharing status, connected device names, Keep Awake, and Launch at Login.
 

@@ -26,6 +26,8 @@ final class ProcessMenu: NSObject, NSMenuDelegate {
         item.toolTip = "Top five readable processes"
         for row in rows {
             row.isEnabled = false
+            // These icons identify processes; macOS 27 hides menu images by default.
+            if #available(macOS 27.0, *) { row.preferredImageVisibility = .visible }
             menu.addItem(row)
         }
         placeholder.isEnabled = false

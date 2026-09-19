@@ -3,7 +3,7 @@ options:
   bundleIdPrefix: com.cydiater
   deploymentTarget:
     macOS: "12.0"
-  xcodeVersion: "26.0"
+  xcodeVersion: "27.0"
 packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
