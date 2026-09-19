@@ -5,6 +5,31 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <item>
+            <title>1.4.0</title>
+            <pubDate>Sat, 19 Sep 2026 19:55:01 +0800</pubDate>
+            <link>https://cydiater.github.io/MyStat/</link>
+            <sparkle:version>8</sparkle:version>
+            <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# MyStat 1.4.0
+
+See how long Keep Awake has left without opening the dropdown.
+
+- A compact coffee-cup badge beside the menu-bar graphs shows the remaining time, updated every second.
+- Untimed sessions show ∞. The badge disappears when the session ends or Keep Awake is switched off.
+- Fixed-width digits keep neighboring menu-bar items steady, including when the countdown passes below one hour.
+- The badge follows the system menu-bar tint in light and dark appearance, with a descriptive tooltip and VoiceOver value.
+- Changing the duration restarts the countdown; changing the display option preserves the deadline.
+
+Developer ID signed and Apple-notarized. Universal Apple silicon / Intel app, macOS 12+.
+
+Install through **Settings → Check for Updates… → Install Update → Install and Relaunch**. Saved preferences are preserved. Relaunching ends an active Keep Awake session; enable it again after the update if needed.
+
+This release updates the Mac companion only.
+]]></description>
+            <enclosure url="https://github.com/Cydiater/MyStat/releases/download/v1.4.0/MyStat-v1.4.0.zip" length="1531343" type="application/octet-stream" sparkle:edSignature="xq1V70dcvcWLdA7LkVESzav3CGk3wyUP3Q1c/+CTgemKK/UlMbeLssCp9pj3nSu77UugcY0rj18V0PKpc4cJDw=="/>
+        </item>
+        <item>
             <title>1.3.1</title>
             <pubDate>Sat, 19 Sep 2026 16:53:48 +0800</pubDate>
             <link>https://cydiater.github.io/MyStat/</link>
@@ -110,6 +135,6 @@ Validation: 30 core tests, dropdown and side-panel placement checks, Keep Awake 
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: e2Nn89Zzb5nBeZG2huV2qO2/9nxv/2xmdUA5+evXdM8YQN3TqCIr7S8YQpG+pufpTks/ikRCpDT+xIqGU2kCCQ==
-length: 8975
+edSignature: VkvLP8KB24XK+/NP5Hkf1u5bgXrPeHAG3wSrHpwQX+y1G0+f4541LqrhcEVDecHwAE98Qj2YbAAoJgzLI0vrAw==
+length: 10694
 -->

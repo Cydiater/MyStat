@@ -4,7 +4,7 @@ A small native Mac system monitor with an iPhone companion. Use the menu bar for
 
 The iPhone app, **MyStat: Desk Monitor**, is not yet available on the App Store. Its initial review requires a physical-device demonstration video; the requested name and subtitle corrections have been saved. It is set to release automatically after approval at **US$5 paid once**, with localized prices elsewhere and a free Mac companion. [Setup & support](https://cydiater.github.io/MyStat/support.html) · [Privacy policy](https://cydiater.github.io/MyStat/privacy.html).
 
-[Download the free Mac companion 1.3.1](https://github.com/Cydiater/MyStat/releases/download/v1.3.1/MyStat-v1.3.1.zip). The universal app supports Apple silicon and Intel Macs and is **Developer ID signed and Apple-notarized**. Existing updater-enabled versions can install it directly through **Check for Updates…**; version 1.3.0 and later place that command under **Settings**.
+[Download the free Mac companion 1.4.0](https://github.com/Cydiater/MyStat/releases/download/v1.4.0/MyStat-v1.4.0.zip). The universal app supports Apple silicon and Intel Macs and is **Developer ID signed and Apple-notarized**. Existing updater-enabled versions can install it directly through **Check for Updates…**; version 1.3.0 and later place that command under **Settings**.
 
 The iPhone app includes **Explore Demo** for trying the dashboard and Desk Display without a Mac. Sample readings are labeled DEMO, kept only in memory, and never saved into your real history or widgets. **Connect My Mac** restores the real connection.
 
@@ -26,6 +26,8 @@ Token collection incrementally reads `sessions` and `archived_sessions` under `C
 The dashboard's history selector supports CPU, memory, download, upload and battery flow. New fields are optional: old Mac servers, old phone clients and saved CPU/memory history remain compatible. Update both apps to see all the new readings. The two tiny menu-bar graphs remain CPU and memory; open the menu for the additional stats.
 
 Mac companion 1.3.0 organizes the dropdown into an **Overview** with CPU and memory charts and a compact **Keep Awake** switch. Click the Keep Awake heading to reveal duration and display options. **Details** opens network, power, storage, thermal, uptime, and Codex readings; **iPhone** contains sharing status and connected devices; **Settings** contains login, updates, About, and Quit. Back or Escape returns to the overview, and reopening the dropdown always starts there. The dropdown uses a native translucent popover, system colors, and standard controls, with Liquid Glass process panels and Back buttons on macOS 26+. Older Macs use native visual-effect materials, and Reduce Transparency and Increase Contrast are respected.
+
+Mac companion 1.4.0 adds a compact Keep Awake badge beside the menu-bar graphs. Timed sessions count down every second; untimed sessions show ∞. The badge keeps a fixed width while active, follows the system menu-bar tint, and disappears when the session ends.
 
 Process readings are sampled on a background queue approximately every two seconds. CPU is measured between samples, with **100% representing one full CPU core**; a multithreaded process can exceed 100%. The first sample, a reused PID, a reset counter or a long sampling gap needs a new baseline before CPU is ranked. Memory is **resident bytes**, includes potentially shared pages, and differs from Activity Monitor's memory footprint. Processes that exit or cannot be read without extra privileges are omitted; this is a ranking of readable processes, not necessarily every process on the system. Names can be shortened by macOS; PIDs distinguish helpers with the same name.
 
@@ -65,7 +67,7 @@ Apple’s references: [Keeping a widget up to date](https://developer.apple.com/
 
 Mac version 1.1.0 includes **About MyStat**, **Check for Updates…**, and an opt-in **Automatically Check for Updates** menu item. Sparkle shows release notes and handles installation/relaunch; automatic checks do not silently install updates. Existing 1.0.0 users need to replace their Mac app manually once to get the updater. The phone can identify a companion that needs upgrading for process rankings.
 
-Updates use signed archives on GitHub Releases and a signed feed on GitHub Pages. No system stats or process data are attached to update checks. See [release and signing instructions](AppStore/mac-updates.md). Version 1.3.1 provides a signed, notarized archive in the feed: Check for Updates offers **Install Update**, then **Install and Relaunch**. Preferences are preserved; an active Keep Awake session ends on relaunch. Older 1.2.0–1.3.0 entries remain historical manual-download notices. The submitted iPhone build is unchanged by this Mac release.
+Updates use signed archives on GitHub Releases and a signed feed on GitHub Pages. No system stats or process data are attached to update checks. See [release and signing instructions](AppStore/mac-updates.md). Version 1.4.0 provides a signed, notarized archive in the feed: Check for Updates offers **Install Update**, then **Install and Relaunch**. Preferences are preserved; an active Keep Awake session ends on relaunch. Older 1.2.0–1.3.0 entries remain historical manual-download notices. The submitted iPhone build is unchanged by this Mac release.
 
 ### macOS
 
@@ -76,7 +78,7 @@ The app runs on macOS 12+. Building the current source requires Xcode 26+ for th
 open MyStat.app
 ```
 
-Run `swift test` for core tests and `scripts/test-status-popover.sh` on macOS for dropdown layout and interaction regression checks, including secondary-page navigation, keyboard shortcuts, collapsed Keep Awake controls, connected-device changes, repeated menu-button clicks, and dismissal with a process panel open. Run `scripts/test-keep-awake.sh` to verify session lifecycle and real macOS sleep assertions, including timed expiry.
+Run `swift test` for core tests and `scripts/test-status-popover.sh` on macOS for dropdown layout and interaction regression checks, including secondary-page navigation, keyboard shortcuts, collapsed Keep Awake controls, connected-device changes, repeated menu-button clicks, and dismissal with a process panel open. Run `scripts/test-keep-awake.sh` to verify session lifecycle, countdown ticks and boundaries, and real macOS sleep assertions, including timed expiry.
 
 For development: `swift run`. The app has no Dock icon. Its menu provides larger charts with 3m / 15m / 1h ranges, iPhone sharing status, connected device names, Keep Awake, and Launch at Login.
 
@@ -102,8 +104,8 @@ xcodebuild -exportNotarizedApp -archivePath .build/MyStat-Mac.xcarchive \
 codesign --verify --deep --strict .build/mac-notarized/MyStat.app
 xcrun stapler validate .build/mac-notarized/MyStat.app
 spctl --assess --type execute --verbose=2 .build/mac-notarized/MyStat.app
-ditto -c -k --keepParent .build/mac-notarized/MyStat.app .build/MyStat-v1.3.1.zip
-scripts/generate-appcast.sh .build/MyStat-v1.3.1.zip AppStore/releases/1.3.1.md
+ditto -c -k --keepParent .build/mac-notarized/MyStat.app .build/MyStat-v1.4.0.zip
+scripts/generate-appcast.sh .build/MyStat-v1.4.0.zip AppStore/releases/1.4.0.md
 ```
 
 ### iPhone and widget
