@@ -1,15 +1,39 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><!-- sparkle-sign-warning:
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- sparkle-sign-warning:
 IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
---><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
-  <channel>
-    <item>
-      <title>MyStat 1.3.0 — GitHub download</title>
-      <sparkle:version>6</sparkle:version>
-      <sparkle:shortVersionString>1.3.0</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <pubDate>Sat, 19 Sep 2026 08:20:20 +0000</pubDate>
-      <link>https://github.com/Cydiater/MyStat/releases/tag/v1.3.0</link>
-      <description format="markdown">Choose **Learn More…** to open GitHub and download this release. Quit MyStat before replacing the app in Applications.
+-->
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <item>
+            <title>1.3.1</title>
+            <pubDate>Sat, 19 Sep 2026 16:53:48 +0800</pubDate>
+            <link>https://cydiater.github.io/MyStat/</link>
+            <sparkle:version>7</sparkle:version>
+            <sparkle:shortVersionString>1.3.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# MyStat 1.3.1
+
+Update MyStat directly from **Settings → Check for Updates…**. Sparkle downloads the update, verifies it, replaces the app, and relaunches it.
+
+- Developer ID signed and Apple-notarized Mac release.
+- Signed update archive and feed enable in-place installation from existing updater-enabled versions.
+- Includes the focused Overview, secondary Details/iPhone/Settings pages, and native materials introduced in 1.3.0, with Liquid Glass on macOS 26+.
+- Existing preferences are preserved. Restarting ends an active Keep Awake session; enable it again after the update if needed.
+
+Universal Apple silicon / Intel app, macOS 12+. This release updates the Mac companion only.
+
+Validation: Developer ID signature, stapled notarization ticket, and Gatekeeper acceptance verified. An isolated 1.3.0 installation downloaded this exact signed archive through Sparkle, installed it, and relaunched as 1.3.1 with saved Keep Awake preferences preserved. Core, dropdown, and Keep Awake regression checks passed for the unchanged application code in 1.3.0.
+]]></description>
+            <enclosure url="https://github.com/Cydiater/MyStat/releases/download/v1.3.1/MyStat-v1.3.1.zip" length="1524710" type="application/octet-stream" sparkle:edSignature="L30jctJ3enpcgXFNmPuUN389uo02ne/xao2Wz/CWDRYSggzpd6YcjFNgoi0dAXTvfrtOiYZXKCzHflYOR6NCDw=="/>
+        </item>
+        <item>
+            <title>MyStat 1.3.0 — GitHub download</title>
+            <sparkle:version>6</sparkle:version>
+            <sparkle:shortVersionString>1.3.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+            <pubDate>Sat, 19 Sep 2026 08:20:20 +0000</pubDate>
+            <link>https://github.com/Cydiater/MyStat/releases/tag/v1.3.0</link>
+            <description format="markdown">Choose **Learn More…** to open GitHub and download this release. Quit MyStat before replacing the app in Applications.
 
 # MyStat 1.3.0
 
@@ -28,15 +52,15 @@ Quit MyStat before replacing the app in Applications. Quitting ends an active Ke
 
 Validation: all 30 core tests, dropdown hierarchy and layout checks, keyboard navigation, repeated menu-button dismissal, side-panel placement, Keep Awake session lifecycle and native sleep assertions, and live light/dark appearance checks. The universal release archive includes a SHA-256 checksum.
 </description>
-    </item>
-    <item>
-      <title>MyStat 1.2.1 — GitHub download</title>
-      <sparkle:version>5</sparkle:version>
-      <sparkle:shortVersionString>1.2.1</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <pubDate>Sat, 19 Sep 2026 03:59:06 +0000</pubDate>
-      <link>https://github.com/Cydiater/MyStat/releases/tag/v1.2.1</link>
-      <description format="markdown">Choose **Learn More…** to open GitHub and download this release. Quit MyStat before replacing the app in Applications.
+        </item>
+        <item>
+            <title>MyStat 1.2.1 — GitHub download</title>
+            <sparkle:version>5</sparkle:version>
+            <sparkle:shortVersionString>1.2.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+            <pubDate>Sat, 19 Sep 2026 03:59:06 +0000</pubDate>
+            <link>https://github.com/Cydiater/MyStat/releases/tag/v1.2.1</link>
+            <description format="markdown">Choose **Learn More…** to open GitHub and download this release. Quit MyStat before replacing the app in Applications.
 
 # MyStat 1.2.1
 
@@ -52,15 +76,15 @@ Quit MyStat before replacing the app in Applications. This updates the Mac compa
 
 Validation: all 30 core tests, dropdown layout and side-panel placement checks, repeated menu-button toggles, and dismissal with a process panel attached. The universal release build includes a SHA-256 checksum. Automated desktop UI inspection was unavailable; interaction checks exercised the AppKit popover directly.
 </description>
-    </item>
-    <item>
-      <title>MyStat 1.2.0 — GitHub download</title>
-      <sparkle:version>4</sparkle:version>
-      <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-      <pubDate>Fri, 18 Sep 2026 17:22:33 +0000</pubDate>
-      <link>https://github.com/Cydiater/MyStat/releases/tag/v1.2.0</link>
-      <description format="markdown">Choose **Learn More…** to open GitHub and download this release. Quit MyStat before replacing the app in Applications.
+        </item>
+        <item>
+            <title>MyStat 1.2.0 — GitHub download</title>
+            <sparkle:version>4</sparkle:version>
+            <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+            <pubDate>Fri, 18 Sep 2026 17:22:33 +0000</pubDate>
+            <link>https://github.com/Cydiater/MyStat/releases/tag/v1.2.0</link>
+            <description format="markdown">Choose **Learn More…** to open GitHub and download this release. Quit MyStat before replacing the app in Applications.
 
 # MyStat 1.2.0
 
@@ -78,13 +102,14 @@ Quit MyStat before replacing the app in Applications. This updates the Mac compa
 
 Validation: 30 core tests, dropdown and side-panel placement checks, Keep Awake lifecycle and real macOS assertion/expiry checks, and a universal release build. The download includes a SHA-256 checksum.
 </description>
-    </item>
-    <title>MyStat Updates</title>
-    <link>https://cydiater.github.io/MyStat/</link>
-    <description>Signed updates for the MyStat Mac companion.</description>
-    <language>en</language>
-  </channel>
-</rss><!-- sparkle-signatures:
-edSignature: ygwPK2CPCK0UhWEs891V9YuzSzbuifT/DB+SYmykjq12cbBNsl2wVe5UGSdco75B7hW+CFfkZbP+wlA/lnmVBg==
-length: 7004
+        </item>
+        <title>MyStat Updates</title>
+        <link>https://cydiater.github.io/MyStat/</link>
+        <description>Signed updates for the MyStat Mac companion.</description>
+        <language>en</language>
+    </channel>
+</rss>
+<!-- sparkle-signatures:
+edSignature: e2Nn89Zzb5nBeZG2huV2qO2/9nxv/2xmdUA5+evXdM8YQN3TqCIr7S8YQpG+pufpTks/ikRCpDT+xIqGU2kCCQ==
+length: 8975
 -->
