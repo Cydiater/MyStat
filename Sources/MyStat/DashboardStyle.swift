@@ -33,30 +33,6 @@ enum DashboardStyle {
         }
     }
 
-    /// Floating process panels use the system's glass and its accessibility
-    /// adaptations. The main dropdown already has an NSPopover material.
-    static func floatingSurface(around content: NSView) -> NSView {
-        let frame = NSRect(origin: .zero, size: content.frame.size)
-        content.frame = frame
-        if #available(macOS 26.0, *) {
-            let glass = NSGlassEffectView(frame: frame)
-            glass.style = .regular
-            glass.cornerRadius = 18
-            glass.contentView = content
-            return glass
-        }
-        let material = NSVisualEffectView(frame: frame)
-        material.material = .popover
-        material.blendingMode = .behindWindow
-        material.state = .active
-        material.wantsLayer = true
-        material.layer?.cornerRadius = 14
-        material.layer?.masksToBounds = true
-        content.autoresizingMask = [.width, .height]
-        material.addSubview(content)
-        return material
-    }
-
     static func label(_ value: String, in rect: NSRect, size: CGFloat = 11,
                       color: NSColor = text, weight: NSFont.Weight = .regular,
                       alignment: NSTextAlignment = .left, mono: Bool = false) {
@@ -67,18 +43,5 @@ enum DashboardStyle {
             .font: mono ? NSFont.monospacedDigitSystemFont(ofSize: size, weight: weight) : NSFont.systemFont(ofSize: size, weight: weight),
             .foregroundColor: color, .paragraphStyle: paragraph
         ])
-    }
-}
-
-final class DashboardCanvas: NSView {
-    override var isOpaque: Bool { false }
-
-    override func draw(_ dirtyRect: NSRect) {
-        // Preserve the native popover backdrop instead of covering it with an
-        // opaque rectangle. The system controls glass, blur, and contrast.
-        if NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency {
-            DashboardStyle.background.setFill()
-            bounds.fill()
-        }
     }
 }

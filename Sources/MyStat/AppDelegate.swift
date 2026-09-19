@@ -5,7 +5,6 @@ import MyStatCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var statusMenu: NSMenu!
-    private var statusPopover: StatusPopover!
     private var timer: Timer?
     private weak var launchAtLoginItem: NSMenuItem?
     private weak var sharingItem: NSMenuItem?
@@ -20,7 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let extendedMonitor = ExtendedMonitor()
     private let tokenMonitor = TokenMonitor()
     private let processMonitor = ProcessMonitor()
-    private lazy var processCharts = ProcessChartGroupView(cpu: cpuChartView, memory: memChartView)
+    private let cpuProcesses = ProcessMenu(metric: .cpu)
+    private let memoryProcesses = ProcessMenu(metric: .memory)
     private let appUpdater = AppUpdater()
     private let detailsView = MetricsOverviewView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: DashboardStyle.detailsHeight))
     private let statsServer = StatsServer()
@@ -79,6 +79,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.imagePosition = .imageOnly
 
         let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.minimumWidth = DashboardStyle.width
         statusMenu = menu
 
         let rangeContainer = NSView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: 46))
@@ -91,9 +93,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         rangeItem.view = rangeContainer
         menu.addItem(rangeItem)
 
-        let chartsItem = NSMenuItem()
-        chartsItem.view = processCharts
-        menu.addItem(chartsItem)
+        for (chart, processes) in [(cpuChartView, cpuProcesses), (memChartView, memoryProcesses)] {
+            let item = NSMenuItem(title: chart.title, action: nil, keyEquivalent: "")
+            item.view = chart
+            menu.addItem(item)
+            menu.addItem(processes.item)
+        }
 
         let keepAwakeMenuItem = NSMenuItem()
         keepAwakeMenuItem.view = keepAwakeView
@@ -106,6 +111,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
         let detailsMenu = NSMenu(title: "Details")
+        detailsMenu.autoenablesItems = false
         let detailsItem = NSMenuItem()
         detailsItem.view = detailsView
         detailsMenu.addItem(detailsItem)
@@ -121,7 +127,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statsServer.onStatusChange = { [weak self] text in
             self?.sharingItem?.title = text
             self?.updateSharingSummary()
-            self?.statusPopover?.refresh()
         }
         let settings = NSMenu(title: "Settings")
 
@@ -151,16 +156,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.addItem(quitItem)
         menu.addItem(Self.section("Settings", subtitle: "Login, updates & app controls", symbol: "gearshape", menu: settings))
         menu.delegate = self
-        statusPopover = StatusPopover(menu: menu)
-        statusPopover.onClose = { [weak self] in self?.processCharts.stopTracking() }
-        statusPopover.onPageChange = { [weak self] overview in
-            guard let self else { return }
-            if overview && self.statusPopover.isShown { self.processCharts.startTracking() }
-            else { self.processCharts.stopTracking() }
-        }
-        keepAwakeView.onHeightChange = { [weak self] in self?.statusPopover.refresh() }
-        statusItem.button?.target = self
-        statusItem.button?.action = #selector(toggleStatusPopover(_:))
+        // AppKit owns menu tracking, cascading submenus, keyboard navigation,
+        // dismissal, and the system's current menu material.
+        statusItem.menu = menu
         appUpdater.start()
 
         statsServer.start()
@@ -174,16 +172,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.refresh()
         }
         RunLoop.main.add(t, forMode: .common)
+        RunLoop.main.add(t, forMode: .eventTracking)
         self.timer = t
     }
 
     private var lastMemorySnapshot = MemorySnapshot(usedBytes: 0, totalBytes: 0)
-
-    @objc private func toggleStatusPopover(_ sender: NSStatusBarButton) {
-        if !statusPopover.isShown { menuWillOpen(statusMenu) }
-        statusPopover.toggle(relativeTo: sender)
-        if statusPopover.isShown { processCharts.startTracking() }
-    }
 
     @objc private func showAbout(_ sender: NSMenuItem) {
         NSApp.activate(ignoringOtherApps: true)
@@ -245,9 +238,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             interval: pollInterval, system: system, tokens: tokenMonitor.latest, processes: processMonitor.latest
         )
         detailsView.update(network: network, power: power, system: system, tokens: tokenMonitor.latest)
-        processCharts.update(processMonitor.latest)
+        cpuProcesses.update(processMonitor.latest)
+        memoryProcesses.update(processMonitor.latest)
         updateDeviceMenu()
-        statusPopover.refresh()
         renderViews()
     }
 

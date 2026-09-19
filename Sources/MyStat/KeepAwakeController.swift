@@ -4,13 +4,18 @@ import IOKit.pwr_mgt
 enum KeepAwakeStatus: Equatable {
     case off
     case indefinite
-    case timed(seconds: Int)
+    case timed(seconds: Int, totalSeconds: Int)
+
+    var remainingFraction: Double? {
+        guard case .timed(let seconds, let totalSeconds) = self else { return nil }
+        return min(1, max(0, Double(seconds) / Double(max(1, totalSeconds))))
+    }
 
     var countdown: String? {
         switch self {
         case .off: return nil
         case .indefinite: return "∞"
-        case .timed(let seconds):
+        case .timed(let seconds, _):
             if seconds >= 3600 {
                 return String(format: "%d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)
             }
@@ -22,7 +27,7 @@ enum KeepAwakeStatus: Equatable {
         switch self {
         case .off: return "Keep Awake off"
         case .indefinite: return "Keep Awake on indefinitely"
-        case .timed(let seconds):
+        case .timed(let seconds, _):
             let parts = [(seconds / 3600, "hour"), (seconds / 60 % 60, "minute"), (seconds % 60, "second")]
                 .filter { $0.0 > 0 }
                 .map { "\($0.0) \($0.1)\($0.0 == 1 ? "" : "s")" }
@@ -66,6 +71,7 @@ final class KeepAwakeController {
     private let now: () -> Date
     private var ids: [IOPMAssertionID] = []
     private var timer: Timer?
+    private var sessionDurationSeconds = 0
     private(set) var durationMinutes: Int
     private(set) var keepsDisplayOn: Bool
     private(set) var endsAt: Date?
@@ -75,7 +81,7 @@ final class KeepAwakeController {
     var status: KeepAwakeStatus {
         guard isActive else { return .off }
         guard let endsAt else { return .indefinite }
-        return .timed(seconds: max(0, Int(ceil(endsAt.timeIntervalSince(now())))))
+        return .timed(seconds: max(0, Int(ceil(endsAt.timeIntervalSince(now())))), totalSeconds: sessionDurationSeconds)
     }
 
     init(assertions: SleepAssertionProviding = SystemSleepAssertions(), defaults: UserDefaults = .standard,
@@ -136,12 +142,14 @@ final class KeepAwakeController {
         ids.forEach { assertions.release($0) }
         ids = acquired
         endsAt = end
+        sessionDurationSeconds = minutes * 60
         errorMessage = nil
         timer?.invalidate()
         timer = nil
         if end != nil {
             let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.refresh() }
             RunLoop.main.add(timer, forMode: .common)
+            RunLoop.main.add(timer, forMode: .eventTracking)
             self.timer = timer
         }
         onChange?()
@@ -160,6 +168,7 @@ final class KeepAwakeController {
         ids.forEach { assertions.release($0) }
         ids.removeAll()
         endsAt = nil
+        sessionDurationSeconds = 0
         errorMessage = nil
         onChange?()
     }

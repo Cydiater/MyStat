@@ -1,4 +1,4 @@
-import Foundation
+import Cocoa
 import IOKit.pwr_mgt
 
 final class FakeAssertions: SleepAssertionProviding {
@@ -32,11 +32,13 @@ now += 60
 controller.setDisplayOn(false)
 precondition(assertions.held.count == 1 && !assertions.held.values.first!.display)
 precondition(controller.endsAt == initialEnd && assertions.held.values.first!.timeout == 840, "Display option must preserve time remaining")
+precondition(controller.status.remainingFraction == 840.0 / 900)
 assertions.failDisplay = true
 let oldIDs = Set(assertions.held.keys)
 controller.setDisplayOn(true)
 precondition(controller.errorMessage != nil && !controller.keepsDisplayOn)
 precondition(Set(assertions.held.keys) == oldIDs && controller.endsAt == initialEnd, "Failure must roll back partial assertions and preserve session")
+precondition(controller.status.remainingFraction == 840.0 / 900, "Failed assertion changes must preserve progress")
 assertions.failDisplay = false
 controller.setDisplayOn(true)
 precondition(controller.errorMessage == nil && assertions.held.count == 2)
@@ -74,10 +76,14 @@ do {
     countdown.onChange = { [weak countdown] in
         if let status = countdown?.status { updates.append(status) }
     }
-    precondition(countdown.status == .off && countdown.status.countdown == nil)
+    precondition(countdown.status == .off && countdown.status.countdown == nil && countdown.status.remainingFraction == nil)
     countdown.selectDuration(60)
     countdown.setActive(true)
     precondition(updates.last?.countdown == "1:00:00", "Starting must immediately show the full duration")
+    precondition(updates.last?.remainingFraction == 1, "A new session starts with a full progress bar")
+    clock -= 20
+    precondition(countdown.status.remainingFraction == 1, "Moving the clock back must not overflow the progress bar")
+    clock += 20
     clock += 0.1
     countdown.refresh()
     precondition(updates.last?.countdown == "1:00:00", "Fractional seconds must round up")
@@ -92,7 +98,13 @@ do {
     precondition(updates.last?.countdown == "59:00", "Display changes must not reset the countdown")
     countdown.selectDuration(15)
     precondition(updates.last?.countdown == "15:00", "Duration changes must immediately restart the countdown")
-    clock += 899.25
+    precondition(updates.last?.remainingFraction == 1, "Changing duration must reset progress to full")
+    clock += 450
+    countdown.refresh()
+    precondition(updates.last?.remainingFraction == 0.5, "Half the session remaining must produce half a bar")
+    countdown.setDisplayOn(true)
+    precondition(updates.last?.remainingFraction == 0.5, "Display changes must preserve progress")
+    clock += 449.25
     countdown.refresh()
     precondition(updates.last?.countdown == "00:01", "Keep the final second visible until expiry")
     precondition(countdown.status.accessibilityDescription == "Keep Awake: 1 second remaining")
@@ -108,6 +120,7 @@ do {
     precondition(updates.last?.countdown == "8:00:00")
     countdown.selectDuration(0)
     precondition(updates.last == .indefinite && countdown.status.countdown == "∞")
+    precondition(countdown.status.remainingFraction == nil, "Untimed sessions must not show timed progress")
     clock += 100_000
     countdown.refresh()
     precondition(countdown.status == .indefinite, "Untimed sessions must keep their infinity indicator")
@@ -115,6 +128,18 @@ do {
     precondition(updates.last == .off && countdown.status.countdown == nil)
 }
 print("PASS: immediate countdown updates, timer ticks, hour/minute boundaries, rounding, expiry, restart, infinity, stop")
+
+// Keep the active indicator small and stable across timed and untimed sessions.
+let app = NSApplication.shared
+app.setActivationPolicy(.prohibited)
+let inactive = StatusBarRenderer.render(cpu: [], memory: [], capacity: 2)
+for status in [KeepAwakeStatus.timed(seconds: 28800, totalSeconds: 28800),
+               .timed(seconds: 450, totalSeconds: 900), .timed(seconds: 1, totalSeconds: 900), .indefinite] {
+    let image = StatusBarRenderer.render(cpu: [], memory: [], capacity: 2, keepAwake: status)
+    precondition(image.size.width - inactive.size.width == 23, "Keep Awake must occupy only 23 extra points")
+    precondition(image.isTemplate && image.size.height == inactive.size.height, "Preserve native menu-bar tint and sizing")
+}
+print("PASS: remaining progress, preserved deadlines, compact and stable menu-bar width")
 
 // Exercise IOKit itself briefly, without changing any persistent power settings.
 let system = SystemSleepAssertions()

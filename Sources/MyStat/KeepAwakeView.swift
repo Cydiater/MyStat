@@ -2,14 +2,13 @@ import Cocoa
 
 final class KeepAwakeView: NSView {
     private let controller: KeepAwakeController
-    private let toggle = NSSwitch()
+    private let toggle = MenuSwitch()
     private let heading = NSButton(title: "Keep Awake", target: nil, action: nil)
     private let duration = NSTextField(labelWithString: "Duration")
     private let status = NSTextField(labelWithString: "")
     private let display = NSButton(checkboxWithTitle: "Keep display on", target: nil, action: nil)
     private let presets = NSSegmentedControl()
     private(set) var isExpanded = false
-    var onHeightChange: (() -> Void)?
 
     init(controller: KeepAwakeController) {
         self.controller = controller
@@ -102,7 +101,6 @@ final class KeepAwakeView: NSView {
     @objc private func toggleOptions() {
         isExpanded.toggle()
         layoutOptions()
-        onHeightChange?()
     }
 
     @objc private func toggleSession() { controller.setActive(toggle.state == .on) }
@@ -111,4 +109,9 @@ final class KeepAwakeView: NSView {
         controller.selectDuration(KeepAwakeController.durations[sender.selectedSegment])
     }
     @objc private func changeDisplay() { controller.setDisplayOn(display.state == .on) }
+}
+
+/// Menu windows do not become key; the switch must accept the first click.
+private final class MenuSwitch: NSSwitch {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }

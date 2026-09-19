@@ -6,20 +6,15 @@ final class StatsChartView: NSView {
     var color: NSColor = DashboardStyle.orange
     var capacity = 90
     var windowMinutes = 3
-    var onProcessPress: (() -> Void)?
     private(set) var values: [Double] = []
-
-    override func mouseDown(with event: NSEvent) { onProcessPress?() }
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-    override func accessibilityPerformPress() -> Bool {
-        guard let onProcessPress else { return false }
-        onProcessPress(); return true
-    }
 
     func update(values: [Double], capacity: Int, subtitle: String) {
         self.values = values
         self.capacity = capacity
         self.subtitle = subtitle
+        setAccessibilityElement(true)
+        setAccessibilityRole(.image)
+        setAccessibilityLabel("\(title) chart")
         setAccessibilityValue(String(format: "%.1f%%, %@", values.last ?? 0, subtitle))
         needsDisplay = true
     }
@@ -33,10 +28,6 @@ final class StatsChartView: NSView {
         DashboardStyle.card(bounds.insetBy(dx: 8, dy: 3))
         DashboardStyle.label(title, in: NSRect(x: 20, y: bounds.height - 26, width: 120, height: 17),
                              size: 12, weight: .semibold)
-        if onProcessPress != nil {
-            DashboardStyle.label("Processes ›", in: NSRect(x: bounds.width - 120, y: bounds.height - 26, width: 100, height: 16),
-                                 size: 11, color: DashboardStyle.muted, alignment: .right)
-        }
         DashboardStyle.label(values.last.map { String(format: "%.1f%%", $0) } ?? "—",
                              in: NSRect(x: 20, y: bounds.height - 56, width: 116, height: 30),
                              size: 25, weight: .medium, mono: true)
