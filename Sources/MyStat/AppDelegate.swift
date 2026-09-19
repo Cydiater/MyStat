@@ -143,9 +143,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastMemorySnapshot = MemorySnapshot(usedBytes: 0, totalBytes: 0)
 
     @objc private func toggleStatusPopover(_ sender: NSStatusBarButton) {
-        menuWillOpen(statusMenu)
-        processCharts.startTracking()
+        if !statusPopover.isShown { menuWillOpen(statusMenu) }
         statusPopover.toggle(relativeTo: sender)
+        if statusPopover.isShown { processCharts.startTracking() }
     }
 
     @objc private func showAbout(_ sender: NSMenuItem) {

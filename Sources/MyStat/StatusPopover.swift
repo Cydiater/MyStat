@@ -10,6 +10,8 @@ final class StatusPopover: NSObject, NSPopoverDelegate {
     private var itemIDs: [ObjectIdentifier] = []
     private var customViews: [ObjectIdentifier: NSView] = [:]
     private var contentHeight: CGFloat = 0
+    private weak var positioningButton: NSView?
+    var isShown: Bool { popover.isShown }
     var onClose: (() -> Void)?
 
     init(menu: NSMenu, popover: NSPopover = NSPopover()) {
@@ -24,7 +26,10 @@ final class StatusPopover: NSObject, NSPopoverDelegate {
     }
 
     func toggle(relativeTo button: NSView) {
-        if popover.isShown { popover.performClose(nil); return }
+        // An explicit toggle must also close any attached process panel.
+        // performClose can refuse to close a popover with a child window.
+        if popover.isShown { popover.close(); return }
+        positioningButton = button
         refresh()
         NSApp.activate(ignoringOtherApps: true)
         let screenHeight = button.window?.screen?.visibleFrame.height ?? NSScreen.main?.visibleFrame.height ?? 800
@@ -113,15 +118,28 @@ final class StatusPopover: NSObject, NSPopoverDelegate {
     }
 
     func popoverShouldClose(_ popover: NSPopover) -> Bool {
+        shouldClose(for: NSApp.currentEvent?.type, at: NSEvent.mouseLocation)
+    }
+
+    func shouldClose(for eventType: NSEvent.EventType?, at location: NSPoint) -> Bool {
+        // Let the status button's action own the entire click. Otherwise the
+        // transient popover can close on mouse-down and reopen on mouse-up.
+        if eventType == .leftMouseDown || eventType == .leftMouseUp,
+           let button = positioningButton, let window = button.window,
+           window.convertToScreen(button.convert(button.bounds, to: nil)).contains(location) {
+            return false
+        }
         // A click on our nonactivating child process panel belongs to this
         // dropdown, even though its window lies outside the popover's bounds.
-        let type = NSApp.currentEvent?.type
-        if type == .leftMouseDown || type == .rightMouseDown {
+        if eventType == .leftMouseDown || eventType == .rightMouseDown {
             let children = controller.view.window?.childWindows ?? []
-            if children.contains(where: { $0.isVisible && $0.frame.contains(NSEvent.mouseLocation) }) { return false }
+            if children.contains(where: { $0.isVisible && $0.frame.contains(location) }) { return false }
         }
         return true
     }
 
-    func popoverDidClose(_ notification: Notification) { onClose?() }
+    func popoverDidClose(_ notification: Notification) {
+        positioningButton = nil
+        onClose?()
+    }
 }

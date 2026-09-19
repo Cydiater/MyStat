@@ -78,3 +78,73 @@ precondition(narrow.width == 222, "Panel should fit available side space")
 precondition(ProcessPanelPlacement.frame(parent: NSRect(x: 100, y: 0, width: 360, height: 600), chart: lowChart,
     screen: NSRect(x: 0, y: 0, width: 560, height: 600), size: panelSize) == nil, "Never overlap when neither side fits")
 print("All side-panel placement checks passed")
+
+// Exercise the mouse-down / mouse-up ordering of a transient popover. AppKit
+// asks to close it before the status button delivers its mouse-up action.
+let toggleMenu = NSMenu()
+toggleMenu.addItem(withTitle: "Toggle regression check", action: nil, keyEquivalent: "")
+let togglePopover = NSPopover()
+let toggleDropdown = StatusPopover(menu: toggleMenu, popover: togglePopover)
+let visibleFrame = NSScreen.main!.visibleFrame
+let anchorWindow = NSWindow(
+    contentRect: NSRect(x: visibleFrame.midX, y: visibleFrame.maxY - 80, width: 140, height: 40),
+    styleMask: [.borderless], backing: .buffered, defer: false
+)
+let anchor = NSButton(frame: NSRect(x: 20, y: 5, width: 100, height: 30))
+anchorWindow.contentView!.addSubview(anchor)
+anchorWindow.orderFrontRegardless()
+defer { anchorWindow.orderOut(nil) }
+let anchorFrame = anchorWindow.convertToScreen(anchor.convert(anchor.bounds, to: nil))
+let anchorPoint = NSPoint(x: anchorFrame.midX, y: anchorFrame.midY)
+let outsidePoint = NSPoint(x: anchorWindow.frame.minX + 2, y: anchorWindow.frame.midY)
+var closeCount = 0
+toggleDropdown.onClose = { closeCount += 1 }
+
+for click in 1...6 {
+    toggleDropdown.toggle(relativeTo: anchor)
+    precondition(togglePopover.isShown, "Click \(click): popover did not open")
+    for eventType in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+        // Simulate AppKit's automatic close attempt before the button action.
+        if toggleDropdown.shouldClose(for: eventType, at: anchorPoint) {
+            togglePopover.performClose(nil)
+        }
+    }
+    toggleDropdown.toggle(relativeTo: anchor)
+    precondition(!togglePopover.isShown, "Click \(click): popover reopened instead of closing")
+    precondition(closeCount == click, "Click \(click): close callback did not run exactly once")
+}
+print("PASS: repeated status-button clicks close without reopening")
+
+toggleDropdown.toggle(relativeTo: anchor)
+precondition(toggleDropdown.shouldClose(for: .leftMouseDown, at: outsidePoint), "Outside clicks must still dismiss")
+precondition(toggleDropdown.shouldClose(for: .rightMouseDown, at: anchorPoint), "Right-click must not wait for a left-click action")
+precondition(toggleDropdown.shouldClose(for: .keyDown, at: anchorPoint), "Escape must still dismiss with the pointer over the button")
+precondition(toggleDropdown.shouldClose(for: nil, at: anchorPoint), "Non-mouse dismissal must still work")
+togglePopover.performClose(nil)
+precondition(!togglePopover.isShown && closeCount == 7, "Normal dismissal failed")
+
+toggleDropdown.toggle(relativeTo: anchor)
+let popoverWindow = togglePopover.contentViewController!.view.window!
+let child = NSPanel(
+    contentRect: NSRect(x: visibleFrame.minX + 10, y: visibleFrame.minY + 10, width: 180, height: 100),
+    styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false
+)
+popoverWindow.addChildWindow(child, ordered: .above)
+child.orderFrontRegardless()
+let childPoint = NSPoint(x: child.frame.midX, y: child.frame.midY)
+for eventType in [NSEvent.EventType.leftMouseDown, .rightMouseDown] {
+    precondition(!toggleDropdown.shouldClose(for: eventType, at: childPoint), "Process-panel clicks must keep the dropdown open")
+}
+toggleDropdown.onClose = {
+    closeCount += 1
+    child.parent?.removeChildWindow(child)
+    child.orderOut(nil)
+}
+toggleDropdown.toggle(relativeTo: anchor)
+precondition(!togglePopover.isShown && !child.isVisible, "Explicit toggle must close the dropdown and its process panel")
+precondition(closeCount == 8, "Process-panel close callback must run exactly once")
+toggleDropdown.toggle(relativeTo: anchor)
+precondition(togglePopover.isShown, "Popover must reopen after closing a process panel")
+toggleDropdown.toggle(relativeTo: anchor)
+precondition(!togglePopover.isShown && closeCount == 9, "Popover must remain toggleable after reopening")
+print("All popover interaction checks passed")
