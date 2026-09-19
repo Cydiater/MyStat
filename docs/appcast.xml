@@ -3,6 +3,33 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
 --><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
   <channel>
     <item>
+      <title>MyStat 1.3.0 — GitHub download</title>
+      <sparkle:version>6</sparkle:version>
+      <sparkle:shortVersionString>1.3.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+      <pubDate>Sat, 19 Sep 2026 08:20:20 +0000</pubDate>
+      <link>https://github.com/Cydiater/MyStat/releases/tag/v1.3.0</link>
+      <description format="markdown">Choose **Learn More…** to open GitHub and download this release. Quit MyStat before replacing the app in Applications.
+
+# MyStat 1.3.0
+
+A more focused Mac dropdown with native translucent materials and Liquid Glass on macOS 26 and later.
+
+- **Overview** keeps CPU, memory, and a compact Keep Awake switch close at hand. Click the Keep Awake heading to reveal duration and display options.
+- **Details**, **iPhone**, and **Settings** put additional readings, connected devices, and app controls on separate pages. Back or Escape returns to Overview; reopening the dropdown always starts there.
+- Floating process panels and Back buttons use native Liquid Glass on macOS 26+. Older versions of macOS use native fallback materials and controls.
+- System colors, lighter chart styling, and standard segmented controls adapt to light and dark appearance. Reduce Transparency and Increase Contrast are respected.
+- Corrected the build's SDK metadata so AppKit uses the current native control design while retaining macOS 12 compatibility.
+- Preserved reliable menu-bar dismissal, process-panel interactions, keyboard shortcuts, and Keep Awake preferences.
+
+**GitHub-only macOS release:** universal Apple silicon / Intel, macOS 12+. This build is ad-hoc signed and not Apple-notarized; macOS may block its first launch. Check for Updates offers a “Learn More…” link to this GitHub download. Installation is manual; Sparkle does not automatically download or install this build.
+
+Quit MyStat before replacing the app in Applications. Quitting ends an active Keep Awake session; enable it again after relaunching if needed. This updates the Mac companion only; the iOS submission is unchanged.
+
+Validation: all 30 core tests, dropdown hierarchy and layout checks, keyboard navigation, repeated menu-button dismissal, side-panel placement, Keep Awake session lifecycle and native sleep assertions, and live light/dark appearance checks. The universal release archive includes a SHA-256 checksum.
+</description>
+    </item>
+    <item>
       <title>MyStat 1.2.1 — GitHub download</title>
       <sparkle:version>5</sparkle:version>
       <sparkle:shortVersionString>1.2.1</sparkle:shortVersionString>
@@ -58,6 +85,6 @@ Validation: 30 core tests, dropdown and side-panel placement checks, Keep Awake 
     <language>en</language>
   </channel>
 </rss><!-- sparkle-signatures:
-edSignature: pwZLTTcn3AeY5dU4FqXesd4D+HFQhBITnl3TgcgJf3tAeByN6VUaaCXdulkagazUG/weICieYkwq8YN8KXQnDA==
-length: 4566
+edSignature: ygwPK2CPCK0UhWEs891V9YuzSzbuifT/DB+SYmykjq12cbBNsl2wVe5UGSdco75B7hW+CFfkZbP+wlA/lnmVBg==
+length: 7004
 -->
