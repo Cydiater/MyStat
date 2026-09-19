@@ -2,7 +2,7 @@ import Cocoa
 import MyStatCore
 
 final class MetricsOverviewView: NSView {
-    private var cards: [(String, String, String, NSColor)] = []
+    private var cards: [(String, String, String)] = []
     private var systemRows: [(String, String)] = []
     private var tokensValue = "—"
     private var tokensDetail = "No local usage"
@@ -13,10 +13,10 @@ final class MetricsOverviewView: NSView {
         let batteryState = power?.status ?? "Unavailable"
         let flow = power?.batteryWatts.map { $0 > 0 ? "Charging" : $0 < 0 ? "Discharging" : "Idle" } ?? "Unavailable"
         cards = [
-            ("DOWNLOAD", MetricFormat.rate(network?.downloadBytesPerSecond), "Physical network adapters", DashboardStyle.green),
-            ("UPLOAD", MetricFormat.rate(network?.uploadBytesPerSecond), "Physical network adapters", DashboardStyle.blue),
-            ("BATTERY", battery, batteryState, DashboardStyle.green),
-            ("BATTERY FLOW", MetricFormat.watts(power?.batteryWatts), "\(flow) · Adapter \(MetricFormat.watts(power?.adapterWatts))", DashboardStyle.orange)
+            ("Download", MetricFormat.rate(network?.downloadBytesPerSecond), "Physical network adapters"),
+            ("Upload", MetricFormat.rate(network?.uploadBytesPerSecond), "Physical network adapters"),
+            ("Battery", battery, batteryState),
+            ("Battery flow", MetricFormat.watts(power?.batteryWatts), "\(flow) · Adapter \(MetricFormat.watts(power?.adapterWatts))")
         ]
         systemRows = [
             ("Storage free", MetricFormat.bytes(system.diskFreeBytes)),
@@ -33,12 +33,16 @@ final class MetricsOverviewView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        DashboardStyle.drawContent(appearance: effectiveAppearance) { drawMetrics() }
+    }
+
+    private func drawMetrics() {
         let width = (bounds.width - 24) / 2
         for (index, card) in cards.enumerated() {
             let rect = NSRect(x: 8 + CGFloat(index % 2) * (width + 8), y: 4 + CGFloat(index / 2) * 64, width: width, height: 58)
             DashboardStyle.card(rect)
-            DashboardStyle.label(card.0, in: NSRect(x: rect.minX + 10, y: rect.minY + 6, width: width - 20, height: 12), size: 9, color: DashboardStyle.muted, weight: .semibold)
-            DashboardStyle.label(card.1, in: NSRect(x: rect.minX + 10, y: rect.minY + 19, width: width - 20, height: 23), size: 19, color: card.3, weight: .medium, mono: true)
+            DashboardStyle.label(card.0, in: NSRect(x: rect.minX + 10, y: rect.minY + 6, width: width - 20, height: 14), size: 10, color: DashboardStyle.muted, weight: .medium)
+            DashboardStyle.label(card.1, in: NSRect(x: rect.minX + 10, y: rect.minY + 20, width: width - 20, height: 23), size: 19, weight: .medium, mono: true)
             DashboardStyle.label(card.2, in: NSRect(x: rect.minX + 10, y: rect.minY + 43, width: width - 20, height: 12), size: 8, color: DashboardStyle.muted)
         }
         DashboardStyle.card(NSRect(x: 8, y: 132, width: bounds.width - 16, height: 70))
@@ -48,8 +52,8 @@ final class MetricsOverviewView: NSView {
             DashboardStyle.label(row.1, in: NSRect(x: 140, y: y, width: bounds.width - 158, height: 16), size: 11, alignment: .right, mono: true)
         }
         DashboardStyle.card(NSRect(x: 8, y: 210, width: bounds.width - 16, height: 58))
-        DashboardStyle.label("CODEX TODAY", in: NSRect(x: 18, y: 218, width: 110, height: 16), size: 9, color: DashboardStyle.muted, weight: .semibold)
-        DashboardStyle.label(tokensValue, in: NSRect(x: 142, y: 215, width: bounds.width - 160, height: 26), size: 22, color: DashboardStyle.blue, weight: .medium, alignment: .right, mono: true)
+        DashboardStyle.label("Codex today", in: NSRect(x: 18, y: 218, width: 110, height: 16), size: 11, color: DashboardStyle.muted, weight: .medium)
+        DashboardStyle.label(tokensValue, in: NSRect(x: 142, y: 215, width: bounds.width - 160, height: 26), size: 22, weight: .medium, alignment: .right, mono: true)
         DashboardStyle.label(tokensDetail, in: NSRect(x: 18, y: 247, width: bounds.width - 36, height: 14), size: 9, color: DashboardStyle.muted, mono: true)
     }
 }

@@ -9,16 +9,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var timer: Timer?
     private weak var launchAtLoginItem: NSMenuItem?
     private weak var sharingItem: NSMenuItem?
+    private weak var sharingSection: NSMenuItem?
+    private let sharingMenu = NSMenu(title: "iPhone")
     private let keepAwakeController = KeepAwakeController()
     private lazy var keepAwakeView = KeepAwakeView(controller: keepAwakeController)
     private let deviceMenuTag = 100
-    private var lastKnownDevices: [String] = []
+    private var lastKnownDevices: [String]?
 
     private let monitor = StatsMonitor()
     private let extendedMonitor = ExtendedMonitor()
     private let tokenMonitor = TokenMonitor()
     private let processMonitor = ProcessMonitor()
-    private lazy var processCharts = ProcessChartGroupView(cpu: cpuChartView, memory: memChartView, details: detailsView)
+    private lazy var processCharts = ProcessChartGroupView(cpu: cpuChartView, memory: memChartView)
     private let appUpdater = AppUpdater()
     private let detailsView = MetricsOverviewView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: DashboardStyle.detailsHeight))
     private let statsServer = StatsServer()
@@ -62,7 +64,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             target: self,
             action: #selector(rangeChanged(_:))
         )
-        sc.frame = NSRect(x: 8, y: 4, width: DashboardStyle.width - 16, height: 22)
+        sc.controlSize = .small
+        sc.segmentStyle = .rounded
+        if #available(macOS 26.0, *) { sc.borderShape = .capsule }
+        for index in labels.indices { sc.setWidth(40, forSegment: index) }
+        sc.sizeToFit()
+        sc.frame.origin = NSPoint(x: DashboardStyle.width - 20 - sc.frame.width, y: (46 - sc.frame.height) / 2)
         sc.selectedSegment = availableRanges.firstIndex { $0.minutes == dropdownMinutes } ?? 0
         return sc
     }()
@@ -74,7 +81,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         statusMenu = menu
 
-        let rangeContainer = NSView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: 30))
+        let rangeContainer = NSView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: 46))
+        let heading = NSTextField(labelWithString: "Overview")
+        heading.font = .systemFont(ofSize: 14, weight: .semibold)
+        heading.frame = NSRect(x: 20, y: 13, width: 150, height: 20)
+        rangeContainer.addSubview(heading)
         rangeContainer.addSubview(rangeControl)
         let rangeItem = NSMenuItem()
         rangeItem.view = rangeContainer
@@ -84,15 +95,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         chartsItem.view = processCharts
         menu.addItem(chartsItem)
 
-        menu.addItem(Self.insetSeparator())
-        let sharing = NSMenuItem(title: "Starting iPhone sharing…", action: nil, keyEquivalent: "")
-        sharing.isEnabled = false
-        menu.addItem(sharing)
-        sharingItem = sharing
-        statsServer.onStatusChange = { [weak self] text in self?.sharingItem?.title = text }
         let keepAwakeMenuItem = NSMenuItem()
         keepAwakeMenuItem.view = keepAwakeView
         menu.addItem(keepAwakeMenuItem)
+
+        menu.addItem(.separator())
+        let detailsMenu = NSMenu(title: "Details")
+        let detailsItem = NSMenuItem()
+        detailsItem.view = detailsView
+        detailsMenu.addItem(detailsItem)
+        menu.addItem(Self.section("Details", subtitle: "Network, power, storage & Codex", symbol: "slider.horizontal.3", menu: detailsMenu))
+
+        let sharing = NSMenuItem(title: "Starting iPhone sharing…", action: nil, keyEquivalent: "")
+        sharing.isEnabled = false
+        sharingMenu.addItem(sharing)
+        sharingItem = sharing
+        let phone = Self.section("iPhone", subtitle: "Starting sharing…", symbol: "iphone", menu: sharingMenu)
+        menu.addItem(phone)
+        sharingSection = phone
+        statsServer.onStatusChange = { [weak self] text in
+            self?.sharingItem?.title = text
+            self?.updateSharingSummary()
+            self?.statusPopover?.refresh()
+        }
+        let settings = NSMenu(title: "Settings")
 
         if #available(macOS 13.0, *) {
             let enabled = SMAppService.mainApp.status == .enabled
@@ -103,25 +129,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
             launchItem.target = self
             launchItem.state = enabled ? .on : .off
-            menu.addItem(launchItem)
+            settings.addItem(launchItem)
             launchAtLoginItem = launchItem
         }
-        menu.addItem(Self.insetSeparator())
+        settings.addItem(appUpdater.checkItem)
+        settings.addItem(appUpdater.automaticItem)
+        settings.addItem(.separator())
         let aboutItem = NSMenuItem(title: "About MyStat", action: #selector(showAbout(_:)), keyEquivalent: "")
         aboutItem.target = self
-        menu.addItem(aboutItem)
-        menu.addItem(appUpdater.checkItem)
-        menu.addItem(appUpdater.automaticItem)
-        menu.addItem(Self.insetSeparator())
+        settings.addItem(aboutItem)
         let quitItem = NSMenuItem(
             title: "Quit MyStat",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )
-        menu.addItem(quitItem)
+        settings.addItem(quitItem)
+        menu.addItem(Self.section("Settings", subtitle: "Login, updates & app controls", symbol: "gearshape", menu: settings))
         menu.delegate = self
         statusPopover = StatusPopover(menu: menu)
         statusPopover.onClose = { [weak self] in self?.processCharts.stopTracking() }
+        statusPopover.onPageChange = { [weak self] overview in
+            guard let self else { return }
+            if overview && self.statusPopover.isShown { self.processCharts.startTracking() }
+            else { self.processCharts.stopTracking() }
+        }
+        keepAwakeView.onHeightChange = { [weak self] in self?.statusPopover.refresh() }
         statusItem.button?.target = self
         statusItem.button?.action = #selector(toggleStatusPopover(_:))
         appUpdater.start()
@@ -158,11 +190,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ])
     }
 
-    /// A separator whose line is inset on the left so it clears the checkmark
-    /// gutter used by the toggle items, instead of spanning the full width.
-    private static func insetSeparator() -> NSMenuItem {
-        let item = NSMenuItem()
-        item.view = InsetSeparatorView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: 11))
+    private static func section(_ title: String, subtitle: String, symbol: String, menu: NSMenu) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.submenu = menu
+        item.toolTip = subtitle
+        item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
         return item
     }
 
@@ -222,16 +254,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateDeviceMenu() {
         let devices = statsServer.activeDevices
+        updateSharingSummary()
         guard devices != lastKnownDevices else { return }
         lastKnownDevices = devices
 
-        guard let menu = statusMenu else { return }
+        let menu = sharingMenu
 
         menu.items.filter { $0.tag >= deviceMenuTag }.forEach { menu.removeItem($0) }
 
-        guard !devices.isEmpty else { return }
+        if devices.isEmpty {
+            let empty = NSMenuItem(title: "No devices connected", action: nil, keyEquivalent: "")
+            empty.tag = deviceMenuTag
+            empty.isEnabled = false
+            menu.addItem(empty)
+            return
+        }
 
-        let insertAt = menu.items.firstIndex(where: { $0 === sharingItem }) ?? 5
+        let insertAt = menu.items.count
         let sep = NSMenuItem.separator()
         sep.tag = deviceMenuTag
         menu.insertItem(sep, at: insertAt)
@@ -243,6 +282,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             item.isEnabled = false
             item.tag = deviceMenuTag + 1 + i
             menu.insertItem(item, at: insertAt + 1 + i)
+        }
+    }
+
+    private func updateSharingSummary() {
+        let count = statsServer.activeDevices.count
+        let status = sharingItem?.title ?? "Starting sharing…"
+        if status == "iPhone sharing available" {
+            sharingSection?.toolTip = count == 0 ? "Ready to connect" : "\(count) \(count == 1 ? "device" : "devices") connected"
+        } else {
+            sharingSection?.toolTip = status
         }
     }
 
@@ -284,23 +333,5 @@ extension AppDelegate: NSMenuDelegate {
         if #available(macOS 13.0, *), let item = launchAtLoginItem {
             item.state = SMAppService.mainApp.status == .enabled ? .on : .off
         }
-    }
-}
-
-/// Draws a thin separator line that is inset from the left edge so it does not
-/// run across the menu's checkmark gutter.
-private final class InsetSeparatorView: NSView {
-    private let leftInset: CGFloat = 21
-    private let rightInset: CGFloat = 8
-
-    override func draw(_ dirtyRect: NSRect) {
-        NSColor.separatorColor.setFill()
-        let line = NSRect(
-            x: leftInset,
-            y: (bounds.height - 1).rounded() / 2,
-            width: bounds.width - leftInset - rightInset,
-            height: 1
-        )
-        line.fill()
     }
 }

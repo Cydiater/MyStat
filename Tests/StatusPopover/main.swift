@@ -5,56 +5,128 @@ import Cocoa
 let app = NSApplication.shared
 app.setActivationPolicy(.prohibited)
 let menu = NSMenu()
-let range = NSView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: 30))
-let charts = NSView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: DashboardStyle.detailsHeight + DashboardStyle.chartHeight * 2))
-for view in [range, charts] {
+let range = NSView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: 46))
+let charts = NSView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: DashboardStyle.chartHeight * 2))
+let domain = "com.cydiater.MyStat.popover-tests.\(UUID().uuidString)"
+let defaults = UserDefaults(suiteName: domain)!
+defer { defaults.removePersistentDomain(forName: domain) }
+let awakeController = KeepAwakeController(defaults: defaults)
+let awake = KeepAwakeView(controller: awakeController)
+for view in [range, charts, awake] {
     let item = NSMenuItem()
     item.view = view
     menu.addItem(item)
 }
 menu.addItem(.separator())
+let details = NSView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: DashboardStyle.detailsHeight))
+let detailsMenu = NSMenu(title: "Details")
+let detailsItem = NSMenuItem()
+detailsItem.view = details
+detailsMenu.addItem(detailsItem)
+let sharingMenu = NSMenu(title: "iPhone")
 let sharing = NSMenuItem(title: "iPhone sharing available", action: nil, keyEquivalent: "")
-menu.addItem(sharing)
-let awake = KeepAwakeView(controller: KeepAwakeController())
-let awakeItem = NSMenuItem()
-awakeItem.view = awake
-menu.addItem(awakeItem)
-for title in ["Launch at Login", "About MyStat", "Check for Updates…", "Automatically Check for Updates", "Quit MyStat"] {
-    menu.addItem(withTitle: title, action: nil, keyEquivalent: "")
+sharing.isEnabled = false
+sharingMenu.addItem(sharing)
+let settingsMenu = NSMenu(title: "Settings")
+final class Actions: NSObject, NSMenuItemValidation {
+    var count = 0
+    var enabled = true
+    @objc func toggle(_ item: NSMenuItem) { item.state = item.state == .on ? .off : .on; count += 1 }
+    func validateMenuItem(_ item: NSMenuItem) -> Bool { enabled }
+}
+let actions = Actions()
+let setting = NSMenuItem(title: "Launch at Login", action: #selector(Actions.toggle(_:)), keyEquivalent: "q")
+setting.target = actions
+settingsMenu.addItem(setting)
+for page in [detailsMenu, sharingMenu, settingsMenu] {
+    let item = NSMenuItem(title: page.title, action: nil, keyEquivalent: "")
+    item.submenu = page
+    menu.addItem(item)
 }
 let popover = NSPopover()
 let dropdown = StatusPopover(menu: menu, popover: popover)
+awake.onHeightChange = { dropdown.refresh() }
 let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: 750), styleMask: [.borderless], backing: .buffered, defer: false)
+var pageChanges: [Bool] = []
+dropdown.onPageChange = { pageChanges.append($0) }
 
-func verifyLayout(_ name: String) {
+func mountPage() -> NSView {
     dropdown.refresh()
     window.contentView = popover.contentViewController!.view
     window.contentView!.layoutSubtreeIfNeeded()
     menu.update()
-    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.1))
-    let scroll = window.contentView as! NSScrollView
-    let document = scroll.documentView!
+    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+    let document = (window.contentView as! NSScrollView).documentView!
     let frames = document.subviews.map(\.frame).sorted { $0.minY < $1.minY }
-    precondition(charts.superview === document && range.superview === document && awake.superview === document, "Lost custom views on rebuild")
-    precondition(charts.frame.height == DashboardStyle.detailsHeight + DashboardStyle.chartHeight * 2 && range.frame.height == 30, "Custom view resized")
     for (lower, upper) in zip(frames, frames.dropFirst()) {
-        precondition(lower.maxY <= upper.minY + 0.5, "\(name): rows overlap: \(lower) / \(upper)")
+        precondition(lower.maxY <= upper.minY + 0.5, "Rows overlap: \(lower) / \(upper)")
     }
+    return document
+}
+func descendants(_ view: NSView) -> [NSView] {
+    view.subviews.flatMap { [$0] + descendants($0) }
+}
+func button(_ title: String, in root: NSView? = nil) -> NSButton {
+    descendants(root ?? popover.contentViewController!.view).compactMap { $0 as? NSButton }.first {
+        $0.title.trimmingCharacters(in: .whitespaces) == title
+    }!
+}
+func verifyLayout(_ name: String) {
+    let document = mountPage()
+    precondition(dropdown.isShowingOverview && details.superview == nil, "Details leaked into overview")
+    precondition(charts.superview === document && range.superview === document && awake.superview === document, "Lost custom views on rebuild")
+    precondition(charts.frame.height == DashboardStyle.chartHeight * 2 && range.frame.height == 46, "Custom view resized")
     precondition(abs(range.frame.maxY - (document.bounds.maxY - 8)) < 0.5, "Range control is not at the top")
     precondition(abs(charts.frame.maxY - range.frame.minY) < 0.5, "Blank space above charts")
-    print("PASS: \(name), charts=\(charts.frame), range=\(range.frame)")
+    print("PASS: \(name), overview height=\(document.frame.height)")
 }
-verifyLayout("initial dropdown")
+verifyLayout("compact overview")
+let compactHeight = popover.contentSize.height
+precondition(compactHeight <= 540, "Overview should fit without the old full dashboard")
 let originalCharts = charts.frame
-menu.insertItem(withTitle: "iPhone Air", action: nil, keyEquivalent: "", at: 3)
-verifyLayout("device connected")
-precondition(charts.frame.minY == originalCharts.minY + 23, "Device row did not reserve its own space")
-menu.removeItem(at: 3)
-verifyLayout("device disconnected")
-precondition(charts.frame == originalCharts, "Layout did not restore after disconnect")
+sharingMenu.addItem(withTitle: "iPhone Air", action: nil, keyEquivalent: "")
+verifyLayout("device connected while hidden")
+precondition(charts.frame == originalCharts, "Connected devices must not change the overview layout")
+button("iPhone").performClick(nil)
+let connectedPage = mountPage()
+precondition(!dropdown.isShowingOverview && charts.superview == nil, "Overview must leave the window on a detail page")
+precondition(descendants(connectedPage).compactMap { $0 as? NSTextField }.contains { $0.stringValue == "iPhone Air" }, "Device names should be readable labels")
+sharingMenu.removeItem(at: 1)
+let phonePage = mountPage()
+precondition(!descendants(phonePage).compactMap({ $0 as? NSTextField }).contains { $0.stringValue == "iPhone Air" }, "Disconnected device remained visible")
+sharing.title = "iPhone sharing: waiting for network"
+dropdown.refresh()
+precondition(descendants(phonePage).compactMap { $0 as? NSTextField }.contains { $0.stringValue == sharing.title }, "Sharing status must refresh on its page")
+button("Back").performClick(nil)
+verifyLayout("back from iPhone")
+button("Details").performClick(nil)
+let detailsPage = mountPage()
+precondition(details.superview === detailsPage && range.superview == nil, "Details must own its page")
 for _ in 0..<3 { dropdown.refresh() }
-verifyLayout("repeated refresh")
-print("All popover layout checks passed")
+precondition(details.superview === detailsPage, "Routine refresh should preserve the current page")
+button("Back").performClick(nil)
+verifyLayout("back from details")
+button("Keep Awake", in: awake).performClick(nil)
+verifyLayout("Keep Awake options expanded")
+precondition(awake.isExpanded && popover.contentSize.height == compactHeight + 88, "Expanded options must resize the popover")
+let durations = descendants(awake).compactMap { $0 as? NSSegmentedControl }.first!
+durations.selectedSegment = KeepAwakeController.durations.firstIndex(of: 30)!
+durations.sendAction(durations.action, to: durations.target)
+button("Keep Awake", in: awake).performClick(nil)
+verifyLayout("Keep Awake options collapsed")
+precondition(!awake.isExpanded && popover.contentSize.height == compactHeight && awakeController.durationMinutes == 30, "Collapsing must preserve preferences")
+button("Settings").performClick(nil)
+_ = mountPage()
+button("Launch at Login").performClick(nil)
+precondition(setting.state == .on && actions.count == 1, "Nested actions must be dispatched")
+actions.enabled = false
+dropdown.refresh()
+precondition(!button("✓  Launch at Login").isEnabled, "Nested action validation must update")
+actions.enabled = true
+button("Back").performClick(nil)
+verifyLayout("back from settings")
+precondition(pageChanges == [false, true, false, true, false, true], "Page lifecycle callbacks must track navigation")
+print("All popover hierarchy and layout checks passed")
 
 let screen = NSRect(x: 0, y: 0, width: 1440, height: 900)
 let panelSize = NSSize(width: 284, height: 222)
@@ -148,3 +220,23 @@ precondition(togglePopover.isShown, "Popover must reopen after closing a process
 toggleDropdown.toggle(relativeTo: anchor)
 precondition(!togglePopover.isShown && closeCount == 9, "Popover must remain toggleable after reopening")
 print("All popover interaction checks passed")
+
+// Keyboard navigation and shortcuts also work when their controls are hidden.
+window.contentView = nil
+dropdown.toggle(relativeTo: anchor)
+button("Details").performClick(nil)
+precondition(popover.isShown && !dropdown.isShowingOverview)
+let escape = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+    windowNumber: 0, context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53)!
+precondition(dropdown.handleKeyDown(escape) && dropdown.isShowingOverview && popover.isShown, "Escape should return from a secondary page")
+precondition(!dropdown.handleKeyDown(escape), "Overview Escape must remain available to the popover and process panel")
+let commandQ = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.command], timestamp: 0,
+    windowNumber: 0, context: nil, characters: "q", charactersIgnoringModifiers: "q", isARepeat: false, keyCode: 12)!
+precondition(dropdown.handleKeyDown(commandQ) && actions.count == 2, "Shortcuts must reach actions inside hidden pages")
+button("iPhone").performClick(nil)
+dropdown.toggle(relativeTo: anchor)
+precondition(!popover.isShown, "Menu button must close a secondary page")
+dropdown.toggle(relativeTo: anchor)
+precondition(popover.isShown && dropdown.isShowingOverview, "Reopening must start on the overview")
+dropdown.toggle(relativeTo: anchor)
+print("PASS: Escape, hidden command shortcuts, dismissal from a detail page, and reopening at overview")

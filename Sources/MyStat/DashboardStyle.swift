@@ -1,33 +1,60 @@
 import Cocoa
 
-/// Shared geometry and an opaque dashboard palette, with light/dark variants.
+/// Semantic colors let AppKit adapt the dashboard to its material and appearance.
 enum DashboardStyle {
     static let width: CGFloat = 360
     static let chartHeight: CGFloat = 124
     static let detailsHeight: CGFloat = 272
-    static let background = color(dark: 0x111217, light: 0xF4F5F7)
-    static let panel = color(dark: 0x181B1F, light: 0xFFFFFF)
-    static let border = color(dark: 0x30343B, light: 0xDDE1E6)
-    static let grid = color(dark: 0x343941, light: 0xE2E5E9)
-    static let text = color(dark: 0xE8EBEF, light: 0x20252B)
-    static let muted = color(dark: 0xA0A8B4, light: 0x626D7A)
-    static let orange = color(dark: 0xFF9930, light: 0xA35100)
-    static let blue = color(dark: 0x5794F2, light: 0x2867C7)
-    static let green = color(dark: 0x73BF69, light: 0x36782B)
+    static let background = NSColor.windowBackgroundColor
+    static let panel = NSColor.controlBackgroundColor
+    static let grid = NSColor.separatorColor.withAlphaComponent(0.35)
+    static let text = NSColor.labelColor
+    static let muted = NSColor.secondaryLabelColor
+    static let orange = NSColor.systemOrange
+    static let blue = NSColor.systemBlue
+    static let green = NSColor.systemGreen
 
-    private static func color(dark: UInt32, light: UInt32) -> NSColor {
-        NSColor(name: nil) { appearance in
-            let hex = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
-            return NSColor(srgbRed: CGFloat((hex >> 16) & 255) / 255,
-                           green: CGFloat((hex >> 8) & 255) / 255,
-                           blue: CGFloat(hex & 255) / 255, alpha: 1)
-        }
+    /// Charts paint colored data without vibrancy blending. Resolve semantic
+    /// colors in Aqua so vibrant appearances don't supply blend-only grays.
+    static func drawContent(appearance: NSAppearance, _ drawing: () -> Void) {
+        let name = appearance.bestMatch(from: [.darkAqua, .aqua]) ?? .aqua
+        NSAppearance(named: name)!.performAsCurrentDrawingAppearance(drawing)
     }
 
     static func card(_ rect: NSRect) {
-        let path = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: 6, yRadius: 6)
-        panel.setFill(); path.fill()
-        border.setStroke(); path.lineWidth = 1; path.stroke()
+        let path = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: 14, yRadius: 14)
+        let opaque = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+        panel.withAlphaComponent(opaque ? 1 : 0.3).setFill()
+        path.fill()
+        if NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast {
+            NSColor.separatorColor.setStroke()
+            path.lineWidth = 1
+            path.stroke()
+        }
+    }
+
+    /// Floating process panels use the system's glass and its accessibility
+    /// adaptations. The main dropdown already has an NSPopover material.
+    static func floatingSurface(around content: NSView) -> NSView {
+        let frame = NSRect(origin: .zero, size: content.frame.size)
+        content.frame = frame
+        if #available(macOS 26.0, *) {
+            let glass = NSGlassEffectView(frame: frame)
+            glass.style = .regular
+            glass.cornerRadius = 18
+            glass.contentView = content
+            return glass
+        }
+        let material = NSVisualEffectView(frame: frame)
+        material.material = .popover
+        material.blendingMode = .behindWindow
+        material.state = .active
+        material.wantsLayer = true
+        material.layer?.cornerRadius = 14
+        material.layer?.masksToBounds = true
+        content.autoresizingMask = [.width, .height]
+        material.addSubview(content)
+        return material
     }
 
     static func label(_ value: String, in rect: NSRect, size: CGFloat = 11,
@@ -44,8 +71,14 @@ enum DashboardStyle {
 }
 
 final class DashboardCanvas: NSView {
+    override var isOpaque: Bool { false }
+
     override func draw(_ dirtyRect: NSRect) {
-        DashboardStyle.background.setFill()
-        bounds.fill()
+        // Preserve the native popover backdrop instead of covering it with an
+        // opaque rectangle. The system controls glass, blur, and contrast.
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency {
+            DashboardStyle.background.setFill()
+            bounds.fill()
+        }
     }
 }

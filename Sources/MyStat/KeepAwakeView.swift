@@ -3,43 +3,57 @@ import Cocoa
 final class KeepAwakeView: NSView {
     private let controller: KeepAwakeController
     private let toggle = NSSwitch()
+    private let heading = NSButton(title: "Keep Awake", target: nil, action: nil)
+    private let duration = NSTextField(labelWithString: "Duration")
     private let status = NSTextField(labelWithString: "")
     private let display = NSButton(checkboxWithTitle: "Keep display on", target: nil, action: nil)
-    private var presets: [NSButton] = []
+    private let presets = NSSegmentedControl()
+    private(set) var isExpanded = false
+    var onHeightChange: (() -> Void)?
 
     init(controller: KeepAwakeController) {
         self.controller = controller
-        super.init(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: 146))
-        let title = NSTextField(labelWithString: "Keep Awake")
-        title.font = .systemFont(ofSize: 13, weight: .semibold)
-        title.frame = NSRect(x: 20, y: 116, width: 220, height: 18)
-        addSubview(title)
-        toggle.frame = NSRect(x: bounds.width - 60, y: 109, width: 40, height: 28)
+        super.init(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: 58))
+        heading.font = .systemFont(ofSize: 13, weight: .medium)
+        heading.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 9, weight: .semibold)
+        heading.isBordered = false
+        heading.alignment = .left
+        heading.imagePosition = .imageLeading
+        heading.target = self
+        heading.action = #selector(toggleOptions)
+        heading.toolTip = "Duration and display options"
+        addSubview(heading)
+        toggle.controlSize = .small
+        toggle.sizeToFit()
         toggle.target = self
         toggle.action = #selector(toggleSession)
         toggle.setAccessibilityLabel("Keep Awake")
         addSubview(toggle)
-        status.font = .systemFont(ofSize: 10)
+        status.font = .systemFont(ofSize: 11)
         status.lineBreakMode = .byTruncatingTail
         status.frame = NSRect(x: 20, y: 94, width: bounds.width - 40, height: 16)
         addSubview(status)
-        let duration = NSTextField(labelWithString: "Duration")
         duration.font = .systemFont(ofSize: 10, weight: .medium)
         duration.textColor = .secondaryLabelColor
         duration.frame = NSRect(x: 20, y: 73, width: 90, height: 15)
         addSubview(duration)
+        presets.segmentCount = KeepAwakeController.labels.count
+        presets.trackingMode = .selectOne
+        presets.segmentStyle = .rounded
+        presets.controlSize = .small
+        presets.font = .systemFont(ofSize: 11)
+        presets.target = self
+        presets.action = #selector(selectDuration(_:))
+        presets.setAccessibilityLabel("Keep Awake duration")
         for (index, label) in KeepAwakeController.labels.enumerated() {
-            let button = DurationButton(title: label, target: self, action: #selector(selectDuration(_:)))
-            button.setButtonType(.toggle)
-            button.isBordered = false
-            button.font = .systemFont(ofSize: 11, weight: .medium)
-            button.frame = NSRect(x: 20 + CGFloat(index) * 46, y: 40, width: 40, height: 28)
-            button.tag = KeepAwakeController.durations[index]
-            button.toolTip = index == 0 ? "Until turned off or MyStat quits" : "\(button.tag) minutes; restarts the timer if active"
-            button.setAccessibilityLabel(index == 0 ? "Indefinitely" : "\(button.tag) minutes")
-            presets.append(button)
-            addSubview(button)
+            presets.setLabel(label, forSegment: index)
+            presets.setWidth(40, forSegment: index)
+            let minutes = KeepAwakeController.durations[index]
+            presets.setToolTip(index == 0 ? "Until turned off or MyStat quits" : "\(minutes) minutes; restarts the timer if active", forSegment: index)
         }
+        presets.sizeToFit()
+        presets.frame.origin = NSPoint(x: (bounds.width - presets.frame.width) / 2, y: 40)
+        addSubview(presets)
         display.frame = NSRect(x: 20, y: 12, width: bounds.width - 40, height: 20)
         display.font = .systemFont(ofSize: 11)
         display.target = self
@@ -47,6 +61,7 @@ final class KeepAwakeView: NSView {
         display.toolTip = "Prevents automatic display sleep. Manual sleep and closing the lid still work."
         addSubview(display)
         controller.onChange = { [weak self] in self?.refresh() }
+        layoutOptions()
         refresh()
     }
 
@@ -57,13 +72,13 @@ final class KeepAwakeView: NSView {
     private func refresh() {
         toggle.state = controller.isActive ? .on : .off
         display.state = controller.keepsDisplayOn ? .on : .off
-        for button in presets {
-            button.state = button.tag == controller.durationMinutes ? .on : .off
-            button.needsDisplay = true
-        }
+        presets.selectedSegment = KeepAwakeController.durations.firstIndex(of: controller.durationMinutes) ?? 0
         let text: String
         if let error = controller.errorMessage { text = error }
-        else if !controller.isActive { text = "Off · Normal sleep settings apply" }
+        else if !controller.isActive {
+            let duration = controller.durationMinutes == 0 ? "Indefinite" : KeepAwakeController.labels[KeepAwakeController.durations.firstIndex(of: controller.durationMinutes)!]
+            text = "Off · \(duration) · \(controller.keepsDisplayOn ? "Display on" : "Display may sleep")"
+        }
         else if let end = controller.endsAt { text = "Active until \(end.formatted(date: .omitted, time: .shortened))" }
         else { text = "Active indefinitely · Until turned off or app quits" }
         status.stringValue = text
@@ -72,21 +87,29 @@ final class KeepAwakeView: NSView {
         toggle.setAccessibilityValue(controller.isActive ? "On. \(text)" : "Off. \(text)")
     }
 
+    private func layoutOptions() {
+        frame.size.height = isExpanded ? 146 : 58
+        heading.frame = NSRect(x: 20, y: bounds.height - 33, width: 240, height: 24)
+        heading.image = NSImage(systemSymbolName: isExpanded ? "chevron.down" : "chevron.right", accessibilityDescription: nil)
+        heading.setAccessibilityLabel(isExpanded ? "Hide Keep Awake options" : "Show Keep Awake options")
+        toggle.frame.origin = NSPoint(x: bounds.width - 20 - toggle.frame.width, y: bounds.height - 22 - toggle.frame.height / 2)
+        status.frame.origin.y = bounds.height - 52
+        duration.isHidden = !isExpanded
+        display.isHidden = !isExpanded
+        presets.isHidden = !isExpanded
+        needsDisplay = true
+    }
+
+    @objc private func toggleOptions() {
+        isExpanded.toggle()
+        layoutOptions()
+        onHeightChange?()
+    }
+
     @objc private func toggleSession() { controller.setActive(toggle.state == .on) }
-    @objc private func selectDuration(_ sender: NSButton) { controller.selectDuration(sender.tag) }
+    @objc private func selectDuration(_ sender: NSSegmentedControl) {
+        guard KeepAwakeController.durations.indices.contains(sender.selectedSegment) else { return }
+        controller.selectDuration(KeepAwakeController.durations[sender.selectedSegment])
+    }
     @objc private func changeDisplay() { controller.setDisplayOn(display.state == .on) }
-}
-
-private final class DurationButton: NSButton {
-    override func draw(_ dirtyRect: NSRect) {
-        let selected = state == .on
-        (selected ? DashboardStyle.blue : DashboardStyle.border).setFill()
-        NSBezierPath(roundedRect: bounds, xRadius: 14, yRadius: 14).fill()
-        DashboardStyle.label(title, in: NSRect(x: 0, y: (bounds.height - 16) / 2, width: bounds.width, height: 16),
-                             size: 11, color: selected ? .white : DashboardStyle.text, weight: .semibold, alignment: .center)
-    }
-
-    override func drawFocusRingMask() {
-        NSBezierPath(roundedRect: bounds, xRadius: 14, yRadius: 14).fill()
-    }
 }

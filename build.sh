@@ -3,10 +3,18 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-swift build -c release --arch arm64 --arch x86_64
+# AppKit selects its native control design using the linked SDK version. Some
+# Swift toolchains stamp the deployment target into both fields, which keeps
+# current macOS releases in the old control appearance. Preserve the minimum
+# OS while explicitly recording the SDK this build actually uses.
+sdk_version=$(xcrun --sdk macosx --show-sdk-version)
+minimum_os=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' Sources/MyStat/Info.plist)
+build_options=(-c release --arch arm64 --arch x86_64
+    -Xlinker -platform_version -Xlinker macos -Xlinker "$minimum_os" -Xlinker "$sdk_version")
+swift build "${build_options[@]}"
 
 APP="MyStat.app"
-BIN="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/MyStat"
+BIN="$(swift build "${build_options[@]}" --show-bin-path)/MyStat"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"

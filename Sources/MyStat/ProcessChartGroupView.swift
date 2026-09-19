@@ -15,7 +15,7 @@ final class ProcessChartGroupView: NSView {
         window.hasShadow = true
         window.hidesOnDeactivate = true
         window.becomesKeyOnlyIfNeeded = true
-        window.contentView = panel
+        window.contentView = DashboardStyle.floatingSurface(around: panel)
         window.collectionBehavior = [.transient, .fullScreenAuxiliary]
         return window
     }()
@@ -29,14 +29,13 @@ final class ProcessChartGroupView: NSView {
     private var hoverTimer: Timer?
     private var keyboardMonitor: Any?
 
-    init(cpu: StatsChartView, memory: StatsChartView, details: NSView) {
+    init(cpu: StatsChartView, memory: StatsChartView) {
         self.cpu = cpu
         self.memory = memory
-        super.init(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: DashboardStyle.detailsHeight + DashboardStyle.chartHeight * 2))
-        cpu.frame = NSRect(x: 0, y: DashboardStyle.detailsHeight + DashboardStyle.chartHeight, width: DashboardStyle.width, height: DashboardStyle.chartHeight)
-        memory.frame = NSRect(x: 0, y: DashboardStyle.detailsHeight, width: DashboardStyle.width, height: DashboardStyle.chartHeight)
-        details.frame = NSRect(x: 0, y: 0, width: DashboardStyle.width, height: DashboardStyle.detailsHeight)
-        for view in [details, memory, cpu] { addSubview(view) }
+        super.init(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: DashboardStyle.chartHeight * 2))
+        cpu.frame = NSRect(x: 0, y: DashboardStyle.chartHeight, width: DashboardStyle.width, height: DashboardStyle.chartHeight)
+        memory.frame = NSRect(x: 0, y: 0, width: DashboardStyle.width, height: DashboardStyle.chartHeight)
+        for view in [memory, cpu] { addSubview(view) }
         for (chart, metric, shortcut) in [(cpu, Metric.cpu, "C"), (memory, .memory, "M")] {
             chart.onProcessPress = { [weak self] in self?.toggle(metric) }
             chart.setAccessibilityElement(true)
@@ -222,9 +221,6 @@ private final class ProcessPanelView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-    override func draw(_ dirtyRect: NSRect) {
-        DashboardStyle.card(bounds)
-    }
     @objc private func closePanel() { onClose?() }
 
     func update(_ snapshot: ProcessSnapshot?, metric: ProcessChartGroupView.Metric, pinned: Bool) {
