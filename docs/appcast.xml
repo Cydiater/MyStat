@@ -3,6 +3,30 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
 --><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
   <channel>
     <item>
+      <title>MyStat 1.2.1 — GitHub download</title>
+      <sparkle:version>5</sparkle:version>
+      <sparkle:shortVersionString>1.2.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+      <pubDate>Sat, 19 Sep 2026 03:59:06 +0000</pubDate>
+      <link>https://github.com/Cydiater/MyStat/releases/tag/v1.2.1</link>
+      <description format="markdown">Choose **Learn More…** to open GitHub and download this release. Quit MyStat before replacing the app in Applications.
+
+# MyStat 1.2.1
+
+Clicking the menu-bar graphs again now reliably dismisses the dashboard.
+
+- Fixed a timing race that could close the pop-up on mouse-down and immediately reopen it on mouse-up.
+- Closing the dashboard also dismisses an attached process panel. Clicking inside a process panel still keeps the dashboard open.
+- Chart hover and keyboard tracking now starts only when the dashboard opens.
+
+**GitHub-only macOS release:** universal Apple silicon / Intel, macOS 12+. This build is ad-hoc signed and not Apple-notarized; macOS may block its first launch. Check for Updates offers a “Learn More…” link to this GitHub download. Installation is manual; Sparkle does not automatically download or install this build.
+
+Quit MyStat before replacing the app in Applications. This updates the Mac companion only; the iOS submission is unchanged.
+
+Validation: all 30 core tests, dropdown layout and side-panel placement checks, repeated menu-button toggles, and dismissal with a process panel attached. The universal release build includes a SHA-256 checksum. Automated desktop UI inspection was unavailable; interaction checks exercised the AppKit popover directly.
+</description>
+    </item>
+    <item>
       <title>MyStat 1.2.0 — GitHub download</title>
       <sparkle:version>4</sparkle:version>
       <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
@@ -34,6 +58,6 @@ Validation: 30 core tests, dropdown and side-panel placement checks, Keep Awake 
     <language>en</language>
   </channel>
 </rss><!-- sparkle-signatures:
-edSignature: KiyrKoFdY+LTZVz8hD4dOiUjvCvPuZAuyH34eCFowTt/DI08qwMsAfu5q8GtxJsu7wukguPavVOhSlP5wTyhBg==
-length: 2827
+edSignature: pwZLTTcn3AeY5dU4FqXesd4D+HFQhBITnl3TgcgJf3tAeByN6VUaaCXdulkagazUG/weICieYkwq8YN8KXQnDA==
+length: 4566
 -->

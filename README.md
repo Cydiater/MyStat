@@ -4,13 +4,13 @@ A small native Mac system monitor with an iPhone companion. Use the menu bar for
 
 The iPhone app, **MyStat: Desk Monitor**, is not yet available on the App Store. Its initial review requires a physical-device demonstration video; the requested name and subtitle corrections have been saved. It is set to release automatically after approval at **US$5 paid once**, with localized prices elsewhere and a free Mac companion. [Setup & support](https://cydiater.github.io/MyStat/support.html) · [Privacy policy](https://cydiater.github.io/MyStat/privacy.html).
 
-[Download the free Mac companion 1.2.0](https://github.com/Cydiater/MyStat/releases/download/v1.2.0/MyStat-v1.2.0.zip). The universal app supports Apple silicon and Intel Macs. This GitHub-only 1.2.0 build is ad-hoc signed and **not notarized**; macOS may block its first launch. The previous [1.0.0 download](https://github.com/Cydiater/MyStat/releases/tag/v1.0.0) remains Developer ID signed and notarized.
+[Download the free Mac companion 1.2.1](https://github.com/Cydiater/MyStat/releases/download/v1.2.1/MyStat-v1.2.1.zip). The universal app supports Apple silicon and Intel Macs. This GitHub-only 1.2.1 build is ad-hoc signed and **not notarized**; macOS may block its first launch. The previous [1.0.0 download](https://github.com/Cydiater/MyStat/releases/tag/v1.0.0) remains Developer ID signed and notarized.
 
 The iPhone app includes **Explore Demo** for trying the dashboard and Desk Display without a Mac. Sample readings are labeled DEMO, kept only in memory, and never saved into your real history or widgets. **Connect My Mac** restores the real connection.
 
 ## Readings
 
-The Mac companion 1.2.0 adds side process panels with app icons, redesigned charts and metric cards, and timed Keep Awake controls that can keep the display on. The iPhone implementation is in the current source but is not part of the submitted iOS 1.0.0 (2) build.
+The Mac companion 1.2.0 adds side process panels with app icons, redesigned charts and metric cards, and timed Keep Awake controls that can keep the display on. Version 1.2.1 fixes repeated menu-bar clicks sometimes reopening the dashboard instead of dismissing it. The iPhone implementation is in the current source but is not part of the submitted iOS 1.0.0 (2) build.
 
 The Mac menu and iPhone dashboard show:
 
@@ -63,7 +63,7 @@ Apple’s references: [Keeping a widget up to date](https://developer.apple.com/
 
 Mac version 1.1.0 includes **About MyStat**, **Check for Updates…**, and an opt-in **Automatically Check for Updates** menu item. Sparkle shows release notes and handles installation/relaunch; automatic checks do not silently install updates. Existing 1.0.0 users need to replace their Mac app manually once to get the updater. The phone can identify a companion that needs upgrading for process rankings.
 
-Updates use signed archives on GitHub Releases and a signed feed on GitHub Pages. No system stats or process data are attached to update checks. See [release and signing instructions](AppStore/mac-updates.md). Version 1.2.0 appears in the signed feed as a manual GitHub download: Check for Updates shows a “Learn More…” button that opens the release page. Sparkle does not download or install this non-notarized build automatically. The submitted iPhone build is unchanged by this Mac release.
+Updates use signed archives on GitHub Releases and a signed feed on GitHub Pages. No system stats or process data are attached to update checks. See [release and signing instructions](AppStore/mac-updates.md). Version 1.2.1 appears in the signed feed as a manual GitHub download: Check for Updates shows a “Learn More…” button that opens the release page. Sparkle does not download or install this non-notarized build automatically. The submitted iPhone build is unchanged by this Mac release.
 
 ### macOS
 
@@ -74,11 +74,11 @@ Requires macOS 12+ and an installed Swift/Xcode toolchain. Launch at Login is av
 open MyStat.app
 ```
 
-Run `swift test` for core tests and `scripts/test-status-popover.sh` on macOS for dropdown layout regression checks, including connected-device changes. Run `scripts/test-keep-awake.sh` to verify session lifecycle and real macOS sleep assertions, including timed expiry.
+Run `swift test` for core tests and `scripts/test-status-popover.sh` on macOS for dropdown layout and interaction regression checks, including connected-device changes, repeated menu-button clicks, and dismissal with a process panel open. Run `scripts/test-keep-awake.sh` to verify session lifecycle and real macOS sleep assertions, including timed expiry.
 
 For development: `swift run`. The app has no Dock icon. Its menu provides larger charts with 3m / 15m / 1h ranges, iPhone sharing status, connected device names, Keep Awake, and Launch at Login.
 
-For a notarized Mac download, use `scripts/release-macos.sh` with `MYSTAT_SIGNING_IDENTITY` set to an installed Developer ID Application identity and `MYSTAT_NOTARY_PROFILE` set to an existing notarytool keychain profile. The script signs with hardened runtime, submits for notarization, staples and validates the ticket, checks Gatekeeper, and creates a ZIP plus SHA-256 checksum under `.build/distribution`. An ordinary `build.sh` output is ad-hoc signed and not notarized. Version 1.2.0 uses that build for its explicitly labeled GitHub-only download.
+For a notarized Mac download, use `scripts/release-macos.sh` with `MYSTAT_SIGNING_IDENTITY` set to an installed Developer ID Application identity and `MYSTAT_NOTARY_PROFILE` set to an existing notarytool keychain profile. The script signs with hardened runtime, submits for notarization, staples and validates the ticket, checks Gatekeeper, and creates a ZIP plus SHA-256 checksum under `.build/distribution`. An ordinary `build.sh` output is ad-hoc signed and not notarized. Version 1.2.1 uses that build for its explicitly labeled GitHub-only download.
 
 Alternatively, use the Mac Xcode project and the Apple Developer account signed into Xcode. This is the route used for version 1.0.0. The project archives both architectures and enables hardened runtime. Change the team in the project and export options if building for another account.
 
