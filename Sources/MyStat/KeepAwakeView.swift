@@ -60,7 +60,6 @@ final class KeepAwakeView: NSView {
         display.action = #selector(changeDisplay)
         display.toolTip = "Prevents automatic display sleep. Manual sleep and closing the lid still work."
         addSubview(display)
-        controller.onChange = { [weak self] in self?.refresh() }
         layoutOptions()
         refresh()
     }
@@ -69,7 +68,7 @@ final class KeepAwakeView: NSView {
 
     override func draw(_ dirtyRect: NSRect) { DashboardStyle.card(bounds.insetBy(dx: 8, dy: 3)) }
 
-    private func refresh() {
+    func refresh() {
         toggle.state = controller.isActive ? .on : .off
         display.state = controller.keepsDisplayOn ? .on : .off
         presets.selectedSegment = KeepAwakeController.durations.firstIndex(of: controller.durationMinutes) ?? 0

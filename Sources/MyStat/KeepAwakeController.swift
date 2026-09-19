@@ -1,6 +1,36 @@
 import Foundation
 import IOKit.pwr_mgt
 
+enum KeepAwakeStatus: Equatable {
+    case off
+    case indefinite
+    case timed(seconds: Int)
+
+    var countdown: String? {
+        switch self {
+        case .off: return nil
+        case .indefinite: return "∞"
+        case .timed(let seconds):
+            if seconds >= 3600 {
+                return String(format: "%d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)
+            }
+            return String(format: "%02d:%02d", seconds / 60, seconds % 60)
+        }
+    }
+
+    var accessibilityDescription: String {
+        switch self {
+        case .off: return "Keep Awake off"
+        case .indefinite: return "Keep Awake on indefinitely"
+        case .timed(let seconds):
+            let parts = [(seconds / 3600, "hour"), (seconds / 60 % 60, "minute"), (seconds % 60, "second")]
+                .filter { $0.0 > 0 }
+                .map { "\($0.0) \($0.1)\($0.0 == 1 ? "" : "s")" }
+            return "Keep Awake: \(parts.isEmpty ? "0 seconds" : parts.joined(separator: ", ")) remaining"
+        }
+    }
+}
+
 protocol SleepAssertionProviding {
     func create(display: Bool, timeout: TimeInterval) throws -> IOPMAssertionID
     func release(_ id: IOPMAssertionID)
@@ -42,6 +72,11 @@ final class KeepAwakeController {
     private(set) var errorMessage: String?
     var onChange: (() -> Void)?
     var isActive: Bool { !ids.isEmpty }
+    var status: KeepAwakeStatus {
+        guard isActive else { return .off }
+        guard let endsAt else { return .indefinite }
+        return .timed(seconds: max(0, Int(ceil(endsAt.timeIntervalSince(now())))))
+    }
 
     init(assertions: SleepAssertionProviding = SystemSleepAssertions(), defaults: UserDefaults = .standard,
          now: @escaping () -> Date = Date.init) {
@@ -103,15 +138,20 @@ final class KeepAwakeController {
         endsAt = end
         errorMessage = nil
         timer?.invalidate()
-        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.refresh() }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
+        timer = nil
+        if end != nil {
+            let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.refresh() }
+            RunLoop.main.add(timer, forMode: .common)
+            self.timer = timer
+        }
         onChange?()
         return true
     }
 
     func refresh() {
-        if isActive, let endsAt, now() >= endsAt { stop() }
+        guard isActive, let endsAt else { return }
+        if now() >= endsAt { stop() }
+        else { onChange?() }
     }
 
     func stop() {

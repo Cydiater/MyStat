@@ -12,6 +12,7 @@ let defaults = UserDefaults(suiteName: domain)!
 defer { defaults.removePersistentDomain(forName: domain) }
 let awakeController = KeepAwakeController(defaults: defaults)
 let awake = KeepAwakeView(controller: awakeController)
+awakeController.onChange = { [weak awake] in awake?.refresh() }
 for view in [range, charts, awake] {
     let item = NSMenuItem()
     item.view = view

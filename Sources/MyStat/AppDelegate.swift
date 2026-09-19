@@ -98,6 +98,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let keepAwakeMenuItem = NSMenuItem()
         keepAwakeMenuItem.view = keepAwakeView
         menu.addItem(keepAwakeMenuItem)
+        keepAwakeController.onChange = { [weak self] in
+            guard let self else { return }
+            self.keepAwakeView.refresh()
+            self.renderStatusBar()
+        }
 
         menu.addItem(.separator())
         let detailsMenu = NSMenu(title: "Details")
@@ -295,17 +300,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func renderViews() {
-        let mem = lastMemorySnapshot
+    private func renderStatusBar() {
         let barSamples = max(2, Int((statusBarMinutes * 60.0 / pollInterval).rounded()))
         let barCpu = Array(history.cpu.suffix(barSamples))
         let barMem = Array(history.memory.suffix(barSamples))
+        let awake = keepAwakeController.status
         if let button = statusItem.button {
             button.image = StatusBarRenderer.render(
-                cpu: barCpu, memory: barMem, capacity: barSamples
+                cpu: barCpu, memory: barMem, capacity: barSamples, keepAwake: awake
             )
+            button.toolTip = "MyStat — \(awake.accessibilityDescription)"
+            button.setAccessibilityLabel("MyStat")
+            button.setAccessibilityValue("CPU and memory. \(awake.accessibilityDescription)")
         }
+    }
 
+    private func renderViews() {
+        renderStatusBar()
+        let mem = lastMemorySnapshot
         let dropSamples = max(2, Int((Double(dropdownMinutes) * 60.0 / pollInterval).rounded()))
         let dropCpu = Array(history.cpu.suffix(dropSamples))
         let dropMem = Array(history.memory.suffix(dropSamples))

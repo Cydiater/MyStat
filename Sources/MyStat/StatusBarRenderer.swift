@@ -6,11 +6,16 @@ enum StatusBarRenderer {
     private static let chartWidth: CGFloat = 26
     private static let chartHeight: CGFloat = 14
     private static let groupGap: CGFloat = 5
+    private static let countdownFont = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+    // Reserve room for hours throughout the session, including the 1:00:00 → 59:59 transition.
+    private static let countdownTextWidth = ceil(("8:00:00" as NSString).size(withAttributes: [.font: countdownFont]).width)
+    private static let countdownWidth = 6 + 12 + 4 + countdownTextWidth + 6
 
-    static func render(cpu: [Double], memory: [Double], capacity: Int) -> NSImage {
+    static func render(cpu: [Double], memory: [Double], capacity: Int, keepAwake: KeepAwakeStatus = .off) -> NSImage {
         let barHeight = NSStatusBar.system.thickness
-        let totalWidth = labelWidth + labelChartGap + chartWidth + groupGap
+        let chartsWidth = labelWidth + labelChartGap + chartWidth + groupGap
             + labelWidth + labelChartGap + chartWidth
+        let totalWidth = chartsWidth + (keepAwake.countdown == nil ? 0 : groupGap + countdownWidth)
         let size = NSSize(width: totalWidth, height: barHeight)
 
         // Snapshot values so the drawing closure isn't racing the recorder.
@@ -47,10 +52,27 @@ enum StatusBarRenderer {
                 rect: NSRect(x: x, y: chartY, width: chartWidth, height: chartHeight),
                 values: memSnapshot, capacity: capacity, color: tint
             )
+            if let countdown = keepAwake.countdown {
+                drawCountdown(countdown, color: tint,
+                    rect: NSRect(x: chartsWidth + groupGap, y: (barHeight - 18) / 2, width: countdownWidth, height: 18))
+            }
             return true
         }
         image.isTemplate = true
         return image
+    }
+
+    private static func drawCountdown(_ text: String, color: NSColor, rect: NSRect) {
+        color.withAlphaComponent(0.10).setFill()
+        NSBezierPath(roundedRect: rect, xRadius: 5, yRadius: 5).fill()
+
+        let symbol = NSImage(systemSymbolName: "cup.and.saucer.fill", accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 10, weight: .medium))
+        symbol?.draw(in: NSRect(x: rect.minX + 6, y: rect.midY - 6, width: 12, height: 12))
+        let label = NSAttributedString(string: text, attributes: [.font: countdownFont, .foregroundColor: color])
+        let size = label.size()
+        let textX = rect.minX + 22 + (countdownTextWidth - size.width) / 2
+        label.draw(at: NSPoint(x: textX, y: rect.midY - size.height / 2))
     }
 
     private static func drawVerticalLabel(_ text: String, color: NSColor, rect: NSRect) {
