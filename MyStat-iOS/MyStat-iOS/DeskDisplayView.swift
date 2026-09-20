@@ -12,26 +12,38 @@ struct DeskDisplayView: View {
         GeometryReader { geometry in
             let landscape = geometry.size.width > geometry.size.height
             let sideBySide = landscape || geometry.size.height < 700
+            let compactMetrics = sideBySide || geometry.size.height < 820
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 let live = client.isLive(at: context.date)
                 VStack(spacing: landscape ? 10 : 16) {
-                    header(live: live)
+                    header(live: live).layoutPriority(1)
                     if showsProcesses {
                         ScrollView {
-                            TopProcessesView(snapshot: client.latest?.processes, sideBySide: landscape, compact: landscape)
+                            VStack(spacing: 12) {
+                                TopProcessesView(snapshot: client.latest?.processes, sideBySide: landscape, compact: landscape)
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text("Top network apps").font(.subheadline.bold()).foregroundStyle(.blue)
+                                    NetworkAppsView(snapshot: client.latest?.networkApps,
+                                        needsCompanionUpdate: client.latest?.needsNetworkCompanionUpdate == true, compact: landscape)
+                                }
+                                .padding(landscape ? 12 : 18)
+                                .background(.blue.opacity(0.055), in: RoundedRectangle(cornerRadius: 18))
+                                .overlay(RoundedRectangle(cornerRadius: 18).stroke(.blue.opacity(0.13)))
+                            }
                         }
                         .frame(maxHeight: .infinity)
                     } else {
                         let layout = sideBySide ? AnyLayout(HStackLayout(spacing: 18)) : AnyLayout(VStackLayout(spacing: 18))
                         layout {
                             metric(title: "CPU", value: client.latest?.cpu, color: .orange,
-                                   detail: "Total processor use", path: \.cpu, now: context.date, compact: sideBySide)
+                                   detail: "Total processor use", path: \.cpu, now: context.date, compact: compactMetrics)
                             metric(title: "MEMORY", value: client.latest?.mem, color: .teal,
-                                   detail: memoryDetail, path: \.mem, now: context.date, compact: sideBySide)
+                                   detail: memoryDetail, path: \.mem, now: context.date, compact: compactMetrics)
                         }
-                        DeskExtrasView(stats: client.latest, compact: landscape)
+                        DeskExtrasView(stats: client.latest, compact: landscape,
+                            samples: Array(client.store.samples.suffix(100)), now: context.date)
                     }
-                    footer(live: live)
+                    footer(live: live).layoutPriority(1)
                 }
                 .padding(landscape ? 16 : 24)
                 .opacity(dimmed ? 0.45 : 1)

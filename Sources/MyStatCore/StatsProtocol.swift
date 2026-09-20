@@ -55,6 +55,7 @@ public struct ServerAddress: Codable, Hashable, Identifiable, Sendable {
 
 public struct CompanionInfo: Codable, Equatable, Sendable {
     public static let processRankings = "process-rankings"
+    public static let networkAppRankings = "network-app-rankings"
     public let version: String
     public let build: String
     public let capabilities: [String]
@@ -76,11 +77,12 @@ public struct LiveStats: Codable, Sendable {
     public let system: SystemStats?
     public let tokens: TokenUsage?
     public let processes: ProcessSnapshot?
+    public let networkApps: NetworkTrafficSnapshot?
     public let companion: CompanionInfo?
 
     public init(sample: StatsSample, host: String?, usedBytes: UInt64? = nil, totalBytes: UInt64? = nil,
                 system: SystemStats? = nil, tokens: TokenUsage? = nil, processes: ProcessSnapshot? = nil,
-                companion: CompanionInfo? = nil) {
+                companion: CompanionInfo? = nil, networkApps: NetworkTrafficSnapshot? = nil) {
         cpu = sample.cpu
         mem = sample.mem
         ts = sample.timestamp.timeIntervalSince1970
@@ -92,6 +94,7 @@ public struct LiveStats: Codable, Sendable {
         self.system = system
         self.tokens = tokens
         self.processes = processes
+        self.networkApps = networkApps
         self.companion = companion
     }
 
@@ -99,6 +102,11 @@ public struct LiveStats: Codable, Sendable {
         if let companion { return !companion.capabilities.contains(CompanionInfo.processRankings) }
         // Companions before capability reporting can still provide process rankings.
         return processes == nil
+    }
+
+    public var needsNetworkCompanionUpdate: Bool {
+        if let companion { return !companion.capabilities.contains(CompanionInfo.networkAppRankings) }
+        return networkApps == nil
     }
 
     public var sample: StatsSample { StatsSample(timestamp: Date(timeIntervalSince1970: ts), cpu: cpu, mem: mem, network: network, power: power) }
@@ -111,6 +119,7 @@ public struct LiveStats: Codable, Sendable {
 
     public var isValid: Bool {
         sample.isValid && (system?.isValid ?? true) && (tokens?.isValid ?? true) && (processes?.isValid ?? true)
+            && (networkApps?.isValid ?? true)
     }
 }
 

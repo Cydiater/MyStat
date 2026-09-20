@@ -13,11 +13,12 @@ struct ContentView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     connectionHeader
-                    if client.isConnected, !client.isDemo, client.latest?.needsProcessCompanionUpdate == true {
+                    if client.isConnected, !client.isDemo,
+                       client.latest?.needsProcessCompanionUpdate == true || client.latest?.needsNetworkCompanionUpdate == true {
                         VStack(alignment: .leading, spacing: 8) {
                             Label("Update MyStat on your Mac", systemImage: "arrow.down.circle")
                                 .font(.headline).foregroundStyle(.orange)
-                            Text("Get the latest companion to see top CPU and memory processes. On your Mac, choose Check for Updates… in MyStat’s menu. If that option is missing, download the latest Mac app once.")
+                            Text("Get the latest companion for CPU, memory and network app rankings. On your Mac, open MyStat → Settings → Check for Updates…. If that option is missing, download the latest Mac app once.")
                                 .font(.footnote).foregroundStyle(.secondary)
                             if let version = client.latest?.companion?.version {
                                 Text("Connected companion: \(version)").font(.caption).foregroundStyle(.secondary)
@@ -58,6 +59,7 @@ struct ContentView: View {
                     .accessibilityIdentifier("openDeskDisplay")
 
                     if let stats = client.latest {
+                        NetworkOverviewView(stats: stats, samples: client.store.samples)
                         TopProcessesView(snapshot: stats.processes)
                         ExtendedStatsView(stats: stats)
                     }

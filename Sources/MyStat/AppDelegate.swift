@@ -19,6 +19,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let extendedMonitor = ExtendedMonitor()
     private let tokenMonitor = TokenMonitor()
     private let processMonitor = ProcessMonitor()
+    private let networkProcessMonitor = NetworkProcessMonitor()
+    private let networkProcesses = NetworkProcessMenu()
+    private let networkChartView = NetworkChartView(frame: NSRect(x: 0, y: 0, width: DashboardStyle.width, height: 140))
     private let cpuProcesses = ProcessMenu(metric: .cpu)
     private let memoryProcesses = ProcessMenu(metric: .memory)
     private let appUpdater = AppUpdater()
@@ -99,6 +102,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(item)
             menu.addItem(processes.item)
         }
+
+        let networkItem = NSMenuItem(title: "Network", action: nil, keyEquivalent: "")
+        networkItem.view = networkChartView
+        menu.addItem(networkItem)
+        menu.addItem(networkProcesses.item)
 
         menu.addItem(.separator())
         menu.addItem(keepAwakeMenu.item)
@@ -218,6 +226,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         dropdownMinutes = availableRanges[idx].minutes
         cpuChartView.windowMinutes = dropdownMinutes
         memChartView.windowMinutes = dropdownMinutes
+        networkChartView.windowMinutes = dropdownMinutes
         renderViews()
     }
 
@@ -229,15 +238,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let system = extendedMonitor.system()
         tokenMonitor.refresh()
         processMonitor.refresh()
+        networkProcessMonitor.refresh()
         history.record(cpu: cpu, memory: mem.percent, network: network, power: power)
         lastMemorySnapshot = mem
         statsServer.update(
             samples: history.samples, usedBytes: mem.usedBytes, totalBytes: mem.totalBytes,
-            interval: pollInterval, system: system, tokens: tokenMonitor.latest, processes: processMonitor.latest
+            interval: pollInterval, system: system, tokens: tokenMonitor.latest, processes: processMonitor.latest,
+            networkApps: networkProcessMonitor.latest?.sharedSnapshot
         )
         detailsView.update(network: network, power: power, system: system, tokens: tokenMonitor.latest)
         cpuProcesses.update(processMonitor.latest)
         memoryProcesses.update(processMonitor.latest)
+        networkProcesses.update(networkProcessMonitor.latest)
         updateDeviceMenu()
         renderViews()
     }
@@ -245,6 +257,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         timer?.invalidate()
         statsServer.stop()
+        networkProcessMonitor.stop()
         keepAwakeController.stop()
     }
 
@@ -295,14 +308,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let barSamples = max(2, Int((statusBarMinutes * 60.0 / pollInterval).rounded()))
         let barCpu = Array(history.cpu.suffix(barSamples))
         let barMem = Array(history.memory.suffix(barSamples))
+        let barNetwork = networkHistory(capacity: barSamples)
         let awake = keepAwakeController.status
         if let button = statusItem.button {
             button.image = StatusBarRenderer.render(
-                cpu: barCpu, memory: barMem, capacity: barSamples, keepAwake: awake
+                cpu: barCpu, memory: barMem, capacity: barSamples, keepAwake: awake, network: barNetwork
             )
-            button.toolTip = "MyStat — \(awake.accessibilityDescription)"
+            let rates = "Download \(MetricFormat.rate(barNetwork.download.last ?? nil)), upload \(MetricFormat.rate(barNetwork.upload.last ?? nil))"
+            button.toolTip = "MyStat — \(rates) — \(awake.accessibilityDescription)"
             button.setAccessibilityLabel("MyStat")
-            button.setAccessibilityValue("CPU and memory. \(awake.accessibilityDescription)")
+            button.setAccessibilityValue("CPU, memory and network. \(rates). \(awake.accessibilityDescription)")
         }
     }
 
@@ -327,6 +342,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 ByteFormat.gb(mem.totalBytes)
             )
         )
+        networkChartView.update(networkHistory(capacity: dropSamples))
+    }
+
+    private func networkHistory(capacity: Int) -> NetworkChartData {
+        let samples = history.samples.suffix(capacity)
+        return NetworkChartData(download: samples.map { $0.network?.downloadBytesPerSecond },
+                                upload: samples.map { $0.network?.uploadBytesPerSecond }, capacity: capacity)
     }
 }
 

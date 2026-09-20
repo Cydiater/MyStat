@@ -275,7 +275,15 @@ final class StatsClient {
             tokens: TokenUsage(inputTokens: 126_400, cachedInputTokens: 84_200, outputTokens: 18_600,
                                updatedAt: now, dayStart: Calendar.current.startOfDay(for: now),
                                timeZone: TimeZone.current.identifier),
-            processes: demoProcesses(at: now))
+            processes: demoProcesses(at: now),
+            networkApps: NetworkTrafficSnapshot(sampledAt: now, apps: [
+                NetworkAppTraffic(pid: 102, name: "Web Browser", downloadBytesPerSecond: sample.network!.downloadBytesPerSecond * 0.75,
+                                  uploadBytesPerSecond: sample.network!.uploadBytesPerSecond * 0.6),
+                NetworkAppTraffic(pid: 104, name: "Music Player", downloadBytesPerSecond: sample.network!.downloadBytesPerSecond * 0.15,
+                                  uploadBytesPerSecond: sample.network!.uploadBytesPerSecond * 0.05),
+                NetworkAppTraffic(pid: 106, name: "Cloud Sync", downloadBytesPerSecond: sample.network!.downloadBytesPerSecond * 0.1,
+                                  uploadBytesPerSecond: sample.network!.uploadBytesPerSecond * 0.35)
+            ]))
     }
 
     private func demoProcesses(at date: Date) -> ProcessSnapshot {

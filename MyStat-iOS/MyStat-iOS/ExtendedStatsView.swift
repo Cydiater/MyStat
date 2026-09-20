@@ -5,13 +5,6 @@ struct ExtendedStatsView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            card("Network", icon: "network", color: .blue) {
-                HStack(spacing: 20) {
-                    reading("DOWNLOAD", value: MetricFormat.rate(stats.network?.downloadBytesPerSecond), color: .blue)
-                    reading("UPLOAD", value: MetricFormat.rate(stats.network?.uploadBytesPerSecond), color: .purple)
-                }
-                Text("Wi-Fi + Ethernet · includes local traffic").font(.caption).foregroundStyle(.secondary)
-            }
             card("Power", icon: "bolt.fill", color: .green) {
                 HStack(spacing: 20) {
                     reading("BATTERY", value: stats.power?.batteryPercent.map { String(format: "%.0f%%", $0) } ?? "—", color: .green)
@@ -93,12 +86,19 @@ struct ExtendedStatsView: View {
 struct DeskExtrasView: View {
     let stats: LiveStats?
     let compact: Bool
+    let samples: [StatsSample]
+    let now: Date
 
     var body: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: compact ? 3 : 2), spacing: 10) {
             tile("NETWORK", color: .blue) {
-                Text("↓ \(MetricFormat.rate(stats?.network?.downloadBytesPerSecond))")
-                Text("↑ \(MetricFormat.rate(stats?.network?.uploadBytesPerSecond))")
+                let layout = compact ? AnyLayout(HStackLayout(spacing: 8)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+                layout {
+                    Text("↓ \(MetricFormat.rate(stats?.network?.downloadBytesPerSecond))").foregroundStyle(.blue)
+                    Text("↑ \(MetricFormat.rate(stats?.network?.uploadBytesPerSecond))").foregroundStyle(.purple)
+                }
+                NetworkHistoryChart(samples: samples, now: now, compact: true)
+                    .frame(height: compact ? 16 : 24)
             }
             tile("POWER", color: .green) {
                 if let watts = stats?.power?.batteryWatts {

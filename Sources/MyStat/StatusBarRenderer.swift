@@ -8,10 +8,12 @@ enum StatusBarRenderer {
     private static let groupGap: CGFloat = 5
     private static let keepAwakeWidth: CGFloat = 18
 
-    static func render(cpu: [Double], memory: [Double], capacity: Int, keepAwake: KeepAwakeStatus = .off) -> NSImage {
+    static func render(cpu: [Double], memory: [Double], capacity: Int, keepAwake: KeepAwakeStatus = .off,
+                       network: NetworkChartData? = nil) -> NSImage {
         let barHeight = NSStatusBar.system.thickness
         let chartsWidth = labelWidth + labelChartGap + chartWidth + groupGap
             + labelWidth + labelChartGap + chartWidth
+            + (network == nil ? 0 : groupGap + labelWidth + labelChartGap + chartWidth)
         let totalWidth = chartsWidth + (keepAwake == .off ? 0 : groupGap + keepAwakeWidth)
         let size = NSSize(width: totalWidth, height: barHeight)
 
@@ -49,6 +51,13 @@ enum StatusBarRenderer {
                 rect: NSRect(x: x, y: chartY, width: chartWidth, height: chartHeight),
                 values: memSnapshot, capacity: capacity, color: tint
             )
+            if let network {
+                x += chartWidth + groupGap
+                drawVerticalLabel("NET", color: tint,
+                    rect: NSRect(x: x, y: 0, width: labelWidth, height: barHeight))
+                x += labelWidth + labelChartGap
+                drawNetwork(network, rect: NSRect(x: x, y: chartY, width: chartWidth, height: chartHeight), color: tint)
+            }
             if keepAwake != .off {
                 drawKeepAwake(keepAwake, color: tint,
                     rect: NSRect(x: chartsWidth + groupGap, y: (barHeight - 18) / 2, width: keepAwakeWidth, height: 18))
@@ -57,6 +66,29 @@ enum StatusBarRenderer {
         }
         image.isTemplate = true
         return image
+    }
+
+    /// Download above the center line, upload below; both use the same rate scale.
+    private static func drawNetwork(_ data: NetworkChartData, rect: NSRect, color: NSColor) {
+        color.withAlphaComponent(0.08).setFill()
+        NSBezierPath(roundedRect: rect, xRadius: 2, yRadius: 2).fill()
+        let center = NSBezierPath()
+        center.move(to: NSPoint(x: rect.minX, y: rect.midY))
+        center.line(to: NSPoint(x: rect.maxX, y: rect.midY))
+        color.withAlphaComponent(0.25).setStroke(); center.lineWidth = 0.5; center.stroke()
+        for (values, direction) in [(data.download, 1.0), (data.upload, -1.0)] {
+            let line = NSBezierPath()
+            line.lineWidth = 1.1; line.lineJoinStyle = .round; line.lineCapStyle = .round
+            var connected = false
+            for (index, value) in values.enumerated() {
+                guard let value else { connected = false; continue }
+                let point = NSPoint(x: rect.minX + CGFloat(data.capacity - values.count + index) / CGFloat(data.capacity - 1) * rect.width,
+                    y: rect.midY + CGFloat(value / data.ceiling * direction) * (rect.height / 2 - 0.5))
+                if connected { line.line(to: point) } else { line.move(to: point) }
+                connected = true
+            }
+            color.setStroke(); line.stroke()
+        }
     }
 
     private static func drawKeepAwake(_ status: KeepAwakeStatus, color: NSColor, rect: NSRect) {

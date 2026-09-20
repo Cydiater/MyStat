@@ -12,7 +12,7 @@ final class ProcessIconProvider {
     func icon(for pid: Int32) -> NSImage {
         guard pid > 0 else { return fallback }
         let application = NSRunningApplication(processIdentifier: pid)
-        let location = application?.bundleURL ?? executableURL(for: pid)
+        let location = application?.bundleURL ?? Self.executableURL(for: pid)
         if let location, let bundle = Self.owningApplication(at: location) {
             let key = bundle as NSURL
             if let icon = cache.object(forKey: key) { return icon }
@@ -40,7 +40,15 @@ final class ProcessIconProvider {
         return application
     }
 
-    private func executableURL(for pid: Int32) -> URL? {
+    func icon(forApplication bundle: URL) -> NSImage {
+        let key = bundle as NSURL
+        if let icon = cache.object(forKey: key) { return icon }
+        let icon = NSWorkspace.shared.icon(forFile: bundle.path)
+        cache.setObject(icon, forKey: key)
+        return icon
+    }
+
+    static func executableURL(for pid: Int32) -> URL? {
         // PROC_PIDPATHINFO_MAXSIZE is (4 * MAXPATHLEN), a macro Swift cannot import.
         var buffer = [UInt8](repeating: 0, count: 4 * Int(MAXPATHLEN))
         let count = buffer.withUnsafeMutableBytes {

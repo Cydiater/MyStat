@@ -10,7 +10,7 @@ final class StatsServer {
     private let companion = CompanionInfo(
         version: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development",
         build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0",
-        capabilities: [CompanionInfo.processRankings, "sparkle-updates"])
+        capabilities: [CompanionInfo.processRankings, CompanionInfo.networkAppRankings, "sparkle-updates"])
     private var history = HistoryPayload(samples: [], interval: 2)
     private var devices: [String: Date] = [:]
     private var connections: [UUID: NWConnection] = [:]
@@ -66,10 +66,11 @@ final class StatsServer {
     }
 
     func update(samples: [StatsSample], usedBytes: UInt64, totalBytes: UInt64, interval: Double,
-                system: SystemStats? = nil, tokens: TokenUsage? = nil, processes: ProcessSnapshot? = nil) {
+                system: SystemStats? = nil, tokens: TokenUsage? = nil, processes: ProcessSnapshot? = nil,
+                networkApps: NetworkTrafficSnapshot? = nil) {
         guard let latest = samples.last else { return }
         snapshot = LiveStats(sample: latest, host: Host.current().localizedName, usedBytes: usedBytes, totalBytes: totalBytes,
-                             system: system, tokens: tokens, processes: processes, companion: companion)
+                             system: system, tokens: tokens, processes: processes, companion: companion, networkApps: networkApps)
         history = HistoryPayload(samples: samples, interval: interval)
     }
 
