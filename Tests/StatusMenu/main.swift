@@ -92,7 +92,7 @@ assertions.fails = true
 // Exercise error presentation without opening a modal alert in this test.
 awakeController.selectDuration(60)
 expectAwakeSummary("Error")
-precondition(awake.item.toolTip == "Assertion unavailable" && awake.item.state == .on)
+precondition(awake.item.accessibilityLabel() == "Assertion unavailable" && awake.item.state == .on)
 precondition(awakeChoice("30 Minutes").state == .on && awakeChoice("1 Hour").state == .off,
              "A failed duration change must preserve the selected preset")
 assertions.fails = false

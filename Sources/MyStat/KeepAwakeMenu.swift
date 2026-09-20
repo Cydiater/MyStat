@@ -63,8 +63,7 @@ final class KeepAwakeMenu: NSObject, NSMenuDelegate {
             status.title = "Active until \(end.formatted(date: .omitted, time: .shortened))"
         } else if controller.isActive { status.title = "Active until turned off or MyStat quits" }
         else { status.title = "Off — enable Keep Awake to start" }
-        item.toolTip = controller.errorMessage ?? controller.status.accessibilityDescription
-        item.setAccessibilityLabel(item.toolTip)
+        item.setAccessibilityLabel(controller.errorMessage ?? controller.status.accessibilityDescription)
     }
 
     func menuWillOpen(_ menu: NSMenu) {

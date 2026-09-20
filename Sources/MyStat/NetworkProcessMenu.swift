@@ -16,7 +16,7 @@ final class NetworkProcessMenu: NSObject, NSMenuDelegate {
         menu.minimumWidth = 320
         menu.delegate = self
         item.submenu = menu
-        item.toolTip = "Top five apps and system processes by combined download and upload"
+        item.setAccessibilityHelp("Top five apps and system processes by combined download and upload")
         for row in rows {
             row.isEnabled = false
             if #available(macOS 27.0, *) { row.preferredImageVisibility = .visible }

@@ -197,7 +197,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static func section(_ title: String, subtitle: String, symbol: String, menu: NSMenu) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         item.submenu = menu
-        item.toolTip = subtitle
+        // Hover tooltips can cover an open cascade; keep this help in accessibility.
+        item.setAccessibilityHelp(subtitle)
         item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
         return item
     }
@@ -298,9 +299,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let count = statsServer.activeDevices.count
         let status = sharingItem?.title ?? "Starting sharing…"
         if status == "iPhone sharing available" {
-            sharingSection?.toolTip = count == 0 ? "Ready to connect" : "\(count) \(count == 1 ? "device" : "devices") connected"
+            sharingSection?.setAccessibilityHelp(count == 0 ? "Ready to connect" : "\(count) \(count == 1 ? "device" : "devices") connected")
         } else {
-            sharingSection?.toolTip = status
+            sharingSection?.setAccessibilityHelp(status)
         }
     }
 

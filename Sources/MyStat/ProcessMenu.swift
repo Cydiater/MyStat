@@ -23,7 +23,7 @@ final class ProcessMenu: NSObject, NSMenuDelegate {
         menu.minimumWidth = 260
         menu.delegate = self
         item.submenu = menu
-        item.toolTip = "Top five readable processes"
+        item.setAccessibilityHelp("Top five readable processes")
         for row in rows {
             row.isEnabled = false
             // These icons identify processes; macOS 27 hides menu images by default.
