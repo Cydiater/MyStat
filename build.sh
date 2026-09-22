@@ -31,12 +31,28 @@ cp "Assets/AppIcon/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 SPARKLE_FRAMEWORK=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
 ditto "$SPARKLE_FRAMEWORK" "$APP/Contents/Frameworks/Sparkle.framework"
 
-# Local builds use an ad-hoc signature. Public downloads require Developer ID
-# signing and notarization; scripts/release-macos.sh performs the full flow.
-if [[ -n "${MYSTAT_SIGNING_IDENTITY:-}" ]]; then
-    signing_args=(--options runtime --timestamp --sign "$MYSTAT_SIGNING_IDENTITY")
+# App Intents rejects ad-hoc processes because they have no signing team ID.
+# Prefer an installed development identity for the Xcode project's team for
+# local builds. An explicit identity still takes precedence for release builds.
+signing_identity="${MYSTAT_SIGNING_IDENTITY:-}"
+if [[ -z "$signing_identity" ]]; then
+    development_team=$(awk '/^[[:space:]]*DEVELOPMENT_TEAM:/ {print $2; exit}' MyStat-macOS/project.yml)
+    while IFS='"' read -r _ candidate _; do
+        [[ "$candidate" == "Apple Development: "* ]] || continue
+        subject=$(security find-certificate -c "$candidate" -p | openssl x509 -noout -subject -nameopt RFC2253)
+        if [[ ",$subject," == *",OU=$development_team,"* ]]; then
+            signing_identity="$candidate"
+            break
+        fi
+    done < <(security find-identity -v -p codesigning)
+fi
+if [[ -n "$signing_identity" && "$signing_identity" != "-" ]]; then
+    echo "Signing with $signing_identity"
+    signing_args=(--options runtime --timestamp --sign "$signing_identity")
 else
     signing_args=(--sign -)
+    echo "Warning: ad-hoc signing supports the menu-bar app, but Spotlight/Shortcuts cannot run its actions." >&2
+    echo "Set MYSTAT_SIGNING_IDENTITY to an Apple Development or Developer ID Application identity to enable App Intents." >&2
 fi
 
 # Sign nested code inside-out; do not use --deep as a signing shortcut.
