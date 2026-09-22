@@ -10,8 +10,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private weak var sharingItem: NSMenuItem?
     private weak var sharingSection: NSMenuItem?
     private let sharingMenu = NSMenu(title: "iPhone")
-    private let keepAwakeController = KeepAwakeController()
+    private let keepAwakeController = KeepAwakeController.shared
     private lazy var keepAwakeMenu = KeepAwakeMenu(controller: keepAwakeController)
+    private static let pinnedMetricKey = "menuBar.pinnedMetric"
+    private lazy var statusBarMode = StatusBarModeMenu(selected:
+        UserDefaults.standard.string(forKey: Self.pinnedMetricKey).flatMap(StatusBarMetric.init(rawValue:)))
+    private var statusBarFocus = StatusBarFocus()
+    private var isMenuOpen = false
     private let deviceMenuTag = 100
     private var lastKnownDevices: [String]?
 
@@ -135,6 +140,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.updateSharingSummary()
         }
         let settings = NSMenu(title: "Settings")
+        settings.addItem(statusBarMode.item)
+        settings.addItem(.separator())
+        statusBarMode.onChange = { [weak self] metric in
+            guard let self else { return }
+            if let metric {
+                UserDefaults.standard.set(metric.rawValue, forKey: Self.pinnedMetricKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Self.pinnedMetricKey)
+                self.statusBarFocus = StatusBarFocus()
+            }
+            self.renderStatusBar()
+        }
 
         if #available(macOS 13.0, *) {
             let enabled = SMAppService.mainApp.status == .enabled
@@ -180,6 +197,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         RunLoop.main.add(t, forMode: .common)
         RunLoop.main.add(t, forMode: .eventTracking)
         self.timer = t
+
+        if #available(macOS 13.0, *) {
+            KeepAwakeShortcuts.updateAppShortcutParameters()
+        }
     }
 
     private var lastMemorySnapshot = MemorySnapshot(usedBytes: 0, totalBytes: 0)
@@ -311,14 +332,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let barMem = Array(history.memory.suffix(barSamples))
         let barNetwork = networkHistory(capacity: barSamples)
         let awake = keepAwakeController.status
+        let highlight = statusBarFocus.update(samples: history.samples, at: Date(), pinned: statusBarMode.selected,
+                                              holdSelection: isMenuOpen)
+        let preferUpload: Bool?
+        if case .trafficChange(_, let upload) = highlight.reason { preferUpload = upload } else { preferUpload = nil }
         if let button = statusItem.button {
             button.image = StatusBarRenderer.render(
-                cpu: barCpu, memory: barMem, capacity: barSamples, keepAwake: awake, network: barNetwork
+                cpu: barCpu, memory: barMem, capacity: barSamples, keepAwake: awake, network: barNetwork,
+                metric: highlight.metric, preferUpload: preferUpload, unavailable: highlight.reason == .unavailable
             )
             let rates = "Download \(MetricFormat.rate(barNetwork.download.last ?? nil)), upload \(MetricFormat.rate(barNetwork.upload.last ?? nil))"
-            button.toolTip = "MyStat — \(rates) — \(awake.accessibilityDescription)"
+            let caption = StatusBarRenderer.caption(cpu: barCpu.last, memory: barMem.last, network: barNetwork,
+                metric: highlight.metric, preferUpload: preferUpload, unavailable: highlight.reason == .unavailable)
+            let value = highlight.metric == .network ? rates : "\(highlight.metric.rawValue) \(caption.value)"
+            let mode = statusBarMode.selected == nil ? "Automatic" : "Pinned"
+            let summary = "\(mode): \(value). \(StatusBarRenderer.explanation(highlight)). \(awake.accessibilityDescription)"
+            button.toolTip = "MyStat — \(summary)"
             button.setAccessibilityLabel("MyStat")
-            button.setAccessibilityValue("CPU, memory and network. \(rates). \(awake.accessibilityDescription)")
+            button.setAccessibilityValue(summary)
         }
     }
 
@@ -355,9 +386,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 extension AppDelegate: NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
+        guard menu === statusMenu else { return }
+        isMenuOpen = true
         keepAwakeController.refresh()
         if #available(macOS 13.0, *), let item = launchAtLoginItem {
             item.state = SMAppService.mainApp.status == .enabled ? .on : .off
         }
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        guard menu === statusMenu else { return }
+        isMenuOpen = false
     }
 }

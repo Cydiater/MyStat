@@ -1,63 +1,43 @@
 import Cocoa
+import MyStatCore
 
 enum StatusBarRenderer {
-    private static let labelWidth: CGFloat = 9
-    private static let labelChartGap: CGFloat = 2
     private static let chartWidth: CGFloat = 26
     private static let chartHeight: CGFloat = 14
     private static let groupGap: CGFloat = 5
     private static let keepAwakeWidth: CGFloat = 18
 
     static func render(cpu: [Double], memory: [Double], capacity: Int, keepAwake: KeepAwakeStatus = .off,
-                       network: NetworkChartData? = nil) -> NSImage {
+                       network: NetworkChartData? = nil, metric: StatusBarMetric = .cpu,
+                       preferUpload: Bool? = nil, unavailable: Bool = false) -> NSImage {
         let barHeight = NSStatusBar.system.thickness
-        let chartsWidth = labelWidth + labelChartGap + chartWidth + groupGap
-            + labelWidth + labelChartGap + chartWidth
-            + (network == nil ? 0 : groupGap + labelWidth + labelChartGap + chartWidth)
-        let totalWidth = chartsWidth + (keepAwake == .off ? 0 : groupGap + keepAwakeWidth)
-        let size = NSSize(width: totalWidth, height: barHeight)
-
-        // Snapshot values so the drawing closure isn't racing the recorder.
-        let cpuSnapshot = cpu
-        let memSnapshot = memory
-
-        // Drawn as a template image: only the alpha channel is used; AppKit
-        // re-tints it to the menu-bar text color (white in dark mode, black in
-        // light) and handles the active/click highlight, matching system icons.
+        let caption = caption(cpu: cpu.last, memory: memory.last, network: network, metric: metric,
+                              preferUpload: preferUpload, unavailable: unavailable)
+        let label = NSAttributedString(string: caption.label, attributes: [
+            .font: NSFont.systemFont(ofSize: 7, weight: .semibold), .foregroundColor: NSColor.black
+        ])
+        let value = NSAttributedString(string: caption.value, attributes: [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .medium), .foregroundColor: NSColor.black
+        ])
+        // Fit the visible caption; a shared maximum width leaves a blank tail
+        // beside short percentages that looks like an inactive Keep Awake slot.
+        let textWidth = ceil(max(label.size().width, value.size().width))
+        let chartsWidth = chartWidth + groupGap + textWidth
+        let size = NSSize(width: chartsWidth + (keepAwake == .off ? 0 : groupGap + keepAwakeWidth), height: barHeight)
+        // AppKit tints the template to the system menu-bar text and selection color.
         let image = NSImage(size: size, flipped: false) { _ in
-            var x: CGFloat = 0
-            let chartY = (barHeight - chartHeight) / 2
-            let tint = NSColor.black // RGB is discarded for template images.
-
-            drawVerticalLabel(
-                "CPU",
-                color: tint,
-                rect: NSRect(x: x, y: 0, width: labelWidth, height: barHeight)
-            )
-            x += labelWidth + labelChartGap
-            drawChart(
-                rect: NSRect(x: x, y: chartY, width: chartWidth, height: chartHeight),
-                values: cpuSnapshot, capacity: capacity, color: tint
-            )
-            x += chartWidth + groupGap
-
-            drawVerticalLabel(
-                "MEM",
-                color: tint,
-                rect: NSRect(x: x, y: 0, width: labelWidth, height: barHeight)
-            )
-            x += labelWidth + labelChartGap
-            drawChart(
-                rect: NSRect(x: x, y: chartY, width: chartWidth, height: chartHeight),
-                values: memSnapshot, capacity: capacity, color: tint
-            )
-            if let network {
-                x += chartWidth + groupGap
-                drawVerticalLabel("NET", color: tint,
-                    rect: NSRect(x: x, y: 0, width: labelWidth, height: barHeight))
-                x += labelWidth + labelChartGap
-                drawNetwork(network, rect: NSRect(x: x, y: chartY, width: chartWidth, height: chartHeight), color: tint)
+            let tint = NSColor.black
+            let rect = NSRect(x: 0, y: (barHeight - chartHeight) / 2, width: chartWidth, height: chartHeight)
+            if metric == .network {
+                drawNetwork(network ?? .init(), rect: rect, color: tint)
+            } else {
+                drawChart(rect: rect, values: metric == .cpu ? cpu : memory, capacity: capacity, color: tint)
             }
+            let blockHeight = label.size().height + value.size().height - 1
+            let bottom = (barHeight - blockHeight) / 2
+            let x = chartWidth + groupGap
+            label.draw(at: NSPoint(x: x, y: bottom + value.size().height - 1))
+            value.draw(at: NSPoint(x: x, y: bottom))
             if keepAwake != .off {
                 drawKeepAwake(keepAwake, color: tint,
                     rect: NSRect(x: chartsWidth + groupGap, y: (barHeight - 18) / 2, width: keepAwakeWidth, height: 18))
@@ -66,6 +46,42 @@ enum StatusBarRenderer {
         }
         image.isTemplate = true
         return image
+    }
+
+    static func caption(cpu: Double?, memory: Double?, network: NetworkChartData?, metric: StatusBarMetric,
+                        preferUpload: Bool? = nil, unavailable: Bool = false) -> (label: String, value: String) {
+        switch metric {
+        case .cpu, .memory:
+            let reading = metric == .cpu ? cpu : memory
+            let value = !unavailable ? reading.flatMap { $0.isFinite && (0...100).contains($0) ? String(format: "%.0f%%", $0) : nil } : nil
+            return (metric == .cpu ? "CPU" : "MEM", value ?? "—")
+        case .network:
+            let down = network?.download.last ?? nil, up = network?.upload.last ?? nil
+            let upload = preferUpload ?? ((up ?? 0) > (down ?? 0))
+            return (upload ? "NET ↑" : "NET ↓", unavailable ? "—" : compactRate(upload ? up : down))
+        }
+    }
+
+    static func compactRate(_ rate: Double?) -> String {
+        guard let rate, rate.isFinite, rate >= 0 else { return "—" }
+        let units = ["B/s", "K/s", "M/s", "G/s", "T/s", "P/s", "E/s"]
+        var value = rate, unit = 0
+        while value >= 999.5 && unit < units.count - 1 { value /= 1_000; unit += 1 }
+        guard value < 999.5 else { return "999E+" }
+        return String(format: value < 9.95 && unit > 0 ? "%.1f%@" : "%.0f%@", value, units[unit])
+    }
+
+    static func explanation(_ highlight: StatusBarHighlight) -> String {
+        switch highlight.reason {
+        case .percentageChange(let delta):
+            return String(format: "%@ %.1f points vs recent baseline", delta >= 0 ? "Up" : "Down", abs(delta))
+        case .trafficChange(let delta, let upload):
+            return "\(upload ? "Upload" : "Download") \(delta >= 0 ? "up" : "down") \(MetricFormat.rate(abs(delta))) vs recent baseline"
+        case .highActivity: return highlight.metric == .memory ? "High memory use" : "Sustained \(highlight.metric.rawValue.lowercased()) activity"
+        case .steady: return "No major recent change"
+        case .warmingUp: return "Collecting recent activity…"
+        case .unavailable: return "\(highlight.metric.rawValue) readings unavailable"
+        }
     }
 
     /// Download above the center line, upload below; both use the same rate scale.
@@ -115,30 +131,12 @@ enum StatusBarRenderer {
         }
     }
 
-    private static func drawVerticalLabel(_ text: String, color: NSColor, rect: NSRect) {
-        let font = NSFont.systemFont(ofSize: 8, weight: .bold)
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: color,
-            .kern: -0.3 as NSNumber,
-        ]
-        let attr = NSAttributedString(string: text, attributes: attrs)
-        let textSize = attr.size()
-
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        ctx.saveGState()
-        defer { ctx.restoreGState() }
-        // Rotate -90° around the rect's center so the string reads top-to-bottom.
-        ctx.translateBy(x: rect.midX, y: rect.midY)
-        ctx.rotate(by: -.pi / 2)
-        attr.draw(at: NSPoint(x: -textSize.width / 2, y: -textSize.height / 2))
-    }
-
     private static func drawChart(rect: NSRect, values: [Double], capacity: Int, color: NSColor) {
         let bg = NSBezierPath(roundedRect: rect, xRadius: 2, yRadius: 2)
-        NSColor.labelColor.withAlphaComponent(0.08).setFill()
+        color.withAlphaComponent(0.08).setFill()
         bg.fill()
 
+        let values = Array(values.suffix(max(2, capacity)))
         guard values.count >= 2, capacity >= 2 else { return }
 
         let step = rect.width / CGFloat(capacity - 1)

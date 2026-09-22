@@ -4,6 +4,18 @@ import IOKit.pwr_mgt
 
 let app = NSApplication.shared
 app.setActivationPolicy(.prohibited)
+let barMode = StatusBarModeMenu(selected: .memory)
+precondition(barMode.item.view == nil && barMode.item.submenu === barMode.menu && barMode.menu.items.allSatisfy { $0.view == nil })
+precondition(barMode.menu.items.filter { $0.state == .on }.map(\.title) == ["Memory"])
+var modeChanges = 0
+var chosenMetric: StatusBarMetric? = .memory
+barMode.onChange = { chosenMetric = $0; modeChanges += 1 }
+barMode.menu.performActionForItem(at: 1)
+precondition(chosenMetric == .cpu && barMode.selected == .cpu && modeChanges == 1)
+barMode.menu.performActionForItem(at: 0)
+precondition(chosenMetric == nil && barMode.selected == nil && modeChanges == 2)
+precondition(barMode.menu.items.filter { $0.state == .on }.map(\.title) == ["Automatic"])
+print("PASS: native menu-bar mode choices, pinning, automatic mode and checkmarks")
 let cpu = ProcessMenu(metric: .cpu)
 let memory = ProcessMenu(metric: .memory)
 let process = ProcessUsage(pid: getpid(), name: "Menu Test", cpuPercent: 24.5, residentBytes: 1_000_000_000)

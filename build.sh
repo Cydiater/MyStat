@@ -24,6 +24,7 @@ mkdir -p "$APP/Contents/Frameworks"
 cp "$BIN" "$APP/Contents/MacOS/MyStat"
 cp "Sources/MyStat/Info.plist" "$APP/Contents/Info.plist"
 cp "Assets/AppIcon/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+./scripts/build-app-intents.sh "$APP/Contents/Resources"
 
 # SwiftPM links the binary framework but does not assemble our .app bundle.
 # ditto preserves the versioned framework's symlinks and helper permissions.

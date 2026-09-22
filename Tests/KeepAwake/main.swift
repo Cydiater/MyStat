@@ -67,6 +67,61 @@ disposable = nil
 precondition(assertions.held.isEmpty, "Deinit must release assertions")
 print("PASS: defaults, timed/indefinite sessions, restart, expiry, display mode, failure rollback, preference restore, cleanup")
 
+// Spotlight and Shortcuts operate on the same session as the menu.
+do {
+    let fake = FakeAssertions()
+    var clock = Date(timeIntervalSince1970: 2000)
+    let actions = KeepAwakeController(assertions: fake, defaults: defaults, now: { clock })
+    actions.selectDuration(30)
+    actions.setDisplayOn(false)
+    var updateCount = 0
+    actions.onChange = { updateCount += 1 }
+    try actions.perform(.start)
+    precondition(actions.endsAt == clock + 1800 && fake.held.count == 1,
+                 "Start must honor the duration and display preferences")
+    precondition(updateCount > 0, "External actions must immediately update the menu and status bar")
+    clock += 60
+    try actions.perform(.start)
+    precondition(actions.endsAt == clock + 1800 && fake.held.count == 1,
+                 "Repeated Start restarts the timer without leaking assertions")
+    try actions.perform(.toggle)
+    precondition(!actions.isActive && fake.held.isEmpty, "Toggle must stop a session started by another entry point")
+    actions.setActive(true)
+    try actions.perform(.stop)
+    try actions.perform(.stop)
+    precondition(!actions.isActive && fake.held.isEmpty, "Stop must be idempotent and stop menu-started sessions")
+    try actions.perform(.toggle)
+    clock += 1801
+    try actions.perform(.toggle)
+    precondition(actions.isActive && actions.endsAt == clock + 1800,
+                 "Toggle after the deadline must start a session even before the next timer tick")
+    actions.stop()
+    actions.setDisplayOn(true)
+    fake.failDisplay = true
+    do {
+        try actions.perform(.start)
+        preconditionFailure("Start must surface assertion failures to Spotlight and Shortcuts")
+    } catch {
+        precondition(error.localizedDescription == actions.errorMessage)
+        precondition(!actions.isActive && fake.held.isEmpty, "Failed actions must release partial assertions")
+    }
+    fake.failDisplay = false
+    try actions.perform(.start)
+    let heldIDs = Set(fake.held.keys)
+    let deadline = actions.endsAt
+    fake.failDisplay = true
+    do {
+        try actions.perform(.start)
+        preconditionFailure("A failed restart must also report an error")
+    } catch {
+        precondition(Set(fake.held.keys) == heldIDs && actions.endsAt == deadline,
+                     "A failed restart must preserve the existing session")
+    }
+    try actions.perform(.stop)
+    precondition(fake.held.isEmpty && actions.errorMessage == nil)
+}
+print("PASS: external start/stop/toggle, shared session behavior, saved preferences, expiry, failure propagation and rollback")
+
 // Countdown presentation follows the deadline, not the number of timer ticks.
 do {
     let fake = FakeAssertions()

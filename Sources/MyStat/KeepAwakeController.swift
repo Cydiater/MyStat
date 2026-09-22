@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import IOKit.pwr_mgt
 
 enum KeepAwakeStatus: Equatable {
@@ -64,6 +64,17 @@ struct SystemSleepAssertions: SleepAssertionProviding {
 
 /// An explicit session: remember preferences, but never resume a session on launch.
 final class KeepAwakeController {
+    // Access on the main thread, like the menu. Intent perform methods use
+    // MainActor so both entry points control the same in-process session.
+    static let shared = KeepAwakeController()
+
+    enum Action { case start, stop, toggle }
+
+    private struct ActionError: LocalizedError {
+        let message: String
+        var errorDescription: String? { message }
+    }
+
     static let durations = [0, 15, 30, 45, 60, 240, 480]
     static let labels = ["∞", "15m", "30m", "45m", "1h", "4h", "8h"]
     private let assertions: SleepAssertionProviding
@@ -102,6 +113,18 @@ final class KeepAwakeController {
     func setActive(_ active: Bool) {
         if active { _ = start(minutes: durationMinutes, display: keepsDisplayOn) }
         else { stop() }
+    }
+
+    /// Run an external action using the menu's saved preferences and report
+    /// assertion failures to the caller instead of claiming success.
+    func perform(_ action: Action) throws {
+        refresh()
+        switch action {
+        case .start: setActive(true)
+        case .stop: stop()
+        case .toggle: setActive(!isActive)
+        }
+        if let errorMessage { throw ActionError(message: errorMessage) }
     }
 
     func selectDuration(_ minutes: Int) {

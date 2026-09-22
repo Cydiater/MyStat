@@ -48,11 +48,23 @@ precondition(clean.download.count == 6 && clean.download[0] == 2 && clean.downlo
 precondition(clean.ceiling == 2000 && NetworkChartData().ceiling == 1000)
 precondition(NetworkChartData(download: [.greatestFiniteMagnitude]).ceiling.isFinite)
 let base = StatusBarRenderer.render(cpu: [0, 20], memory: [40, 50], capacity: 2)
-let net = StatusBarRenderer.render(cpu: [0, 20], memory: [40, 50], capacity: 2, network: clean)
-let unavailable = StatusBarRenderer.render(cpu: [], memory: [], capacity: 2, network: .init())
-precondition(net.size.width == base.size.width + 42 && net.isTemplate && net.size == unavailable.size,
-             "The network graph stays compact and does not resize with throughput or missing data")
-print("PASS: chart range, invalid data gaps, capacity, scale and fixed menu-bar width")
+let net = StatusBarRenderer.render(cpu: [0, 20], memory: [40, 50], capacity: 2, network: clean, metric: .network)
+let unavailable = StatusBarRenderer.render(cpu: [], memory: [], capacity: 2, network: .init(), metric: .network)
+let mem = StatusBarRenderer.render(cpu: [0, 20], memory: [40, 50], capacity: 2, metric: .memory)
+precondition(base.size.width < 75 && mem.size == base.size && net.size.width < 75 && unavailable.size.width < net.size.width,
+             "Each caption must fit its text instead of reserving space for longer readings")
+precondition([base, net, unavailable, mem].allSatisfy { $0.isTemplate && $0.size.height == base.size.height })
+for (rate, expected) in [(0.0, "0B/s"), (999, "999B/s"), (999.5, "1.0K/s"), (9_999, "10K/s"),
+                         (999_500, "1.0M/s"), (1_200_000, "1.2M/s"), (120_000_000, "120M/s")] {
+    precondition(StatusBarRenderer.compactRate(rate) == expected)
+    let width = NSAttributedString(string: expected, attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .medium)]).size().width
+    precondition(width <= 44, "A formatted rate must fit without clipping or resizing the item")
+}
+precondition(StatusBarRenderer.compactRate(.nan) == "—" && StatusBarRenderer.compactRate(-1) == "—")
+let uploadCaption = StatusBarRenderer.caption(cpu: nil, memory: nil, network: clean, metric: .network, preferUpload: true)
+precondition(uploadCaption.label == "NET ↑" && uploadCaption.value == "400B/s")
+precondition(StatusBarRenderer.caption(cpu: 30, memory: 60, network: clean, metric: .cpu, unavailable: true).value == "—")
+print("PASS: chart range, invalid data gaps, capacity, scale and compact menu-bar captions")
 
 let menu = NetworkProcessMenu()
 precondition(menu.item.view == nil && menu.item.submenu === menu.menu && menu.menu.items.allSatisfy { $0.view == nil })
